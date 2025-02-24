@@ -55,7 +55,7 @@ fn test_recursive_minimisation() {
 
     let _ = solver.add_clause(vec![alpha, !beta]);
     let _ = solver.add_clause(vec![u, !t]);
-    let _ = solver.add_clause(vec![k, !l]);
+    let _ = solver.add_clause(vec![k, !l, !n]);
     let _ = solver.add_clause(vec![f, !i, !h]);
 
     let _ = solver.add_clause(vec![beta, !gamma]);
@@ -111,7 +111,6 @@ fn test_recursive_minimisation() {
         &solver.clausal_propagator,
         &mut solver.clause_allocator,
     );
-
     minimiser.minimise(context, &mut learned_clause);
 
     assert_elements_equal(learned_clause.literals, vec![!p, !j, !k, !i, !r, !q])
