@@ -1,4 +1,5 @@
 use crate::basic_types::ClauseReference;
+use crate::basic_types::Conjunction;
 use crate::engine::cp::propagation::propagation_context::HasAssignments;
 use crate::engine::cp::propagation::PropagationContext;
 use crate::engine::cp::reason::ReasonRef;
@@ -58,6 +59,22 @@ impl<'a> MinimisationContext<'a> {
             .get_predicates_for_literal(literal)
     }
 
+    /// Returns the reason for the provided `literal` in the form `l_1 /\ ... /\ l_n -> literal`
+    #[allow(unused, reason = "will be used in an assignment")]
+    pub(crate) fn get_reason(&mut self, literal: Literal) -> Conjunction {
+        let clause_reference = self.get_propagation_clause_reference(literal);
+        // 0-th literal is the propagated literal so it is skipped
+        self.clause_allocator[clause_reference].get_literal_slice()[1..]
+            .iter()
+            .copied()
+            .map(|literal| !literal)
+            .collect::<Vec<_>>()
+            .into()
+    }
+}
+
+/// Private helper methods
+impl MinimisationContext<'_> {
     /// Given a propagated literal, returns a clause reference of the clause that propagates the
     /// literal. In case the literal was propagated by a clause, the propagating clause is
     /// returned. Otherwise, the literal was propagated by a propagator, in which case a new

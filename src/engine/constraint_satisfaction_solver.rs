@@ -13,7 +13,7 @@ use rand::SeedableRng;
 
 use super::conflict_analysis::AllDecisionLearning;
 use super::conflict_analysis::ConflictResolver;
-use super::conflict_analysis::LearnedClause;
+use super::conflict_analysis::LearnedNogood;
 use super::conflict_analysis::NoLearning;
 use super::conflict_analysis::UniqueImplicationPoint;
 use super::cp::propagation::PropagationContext;
@@ -857,8 +857,8 @@ impl ConstraintSatisfactionSolver {
         self.reason_store.increase_decision_level();
     }
 
-    fn minimise_learned_clause(&mut self, learned_clause: &mut LearnedClause) {
-        let num_literals_before = learned_clause.literals.len();
+    fn minimise_learned_nogood(&mut self, learned_nogood: &mut LearnedNogood) {
+        let num_literals_before = learned_nogood.literals.len();
         let context = MinimisationContext::new(
             &self.assignments_integer,
             &self.assignments_propositional,
@@ -871,23 +871,23 @@ impl ConstraintSatisfactionSolver {
         match self.internal_parameters.minimisation_strategy {
             ClauseMinimisationStrategy::NoMinimisation => {}
             ClauseMinimisationStrategy::Recursive => {
-                self.recursive_minimiser.minimise(context, learned_clause);
+                self.recursive_minimiser.minimise(context, learned_nogood);
                 self.counters
                     .average_number_of_literals_removed_recursive
-                    .add_term((num_literals_before - learned_clause.literals.len()) as u64);
+                    .add_term((num_literals_before - learned_nogood.literals.len()) as u64);
             }
             ClauseMinimisationStrategy::Semantic => {
-                self.semantic_minimiser.minimise(context, learned_clause);
+                self.semantic_minimiser.minimise(context, learned_nogood);
                 self.counters
                     .average_number_of_literals_removed_semantic
-                    .add_term((num_literals_before - learned_clause.literals.len()) as u64);
+                    .add_term((num_literals_before - learned_nogood.literals.len()) as u64);
             }
             ClauseMinimisationStrategy::RecursiveSemantic => {
-                self.recursive_minimiser.minimise(context, learned_clause);
+                self.recursive_minimiser.minimise(context, learned_nogood);
                 self.counters
                     .average_number_of_literals_removed_recursive
-                    .add_term((num_literals_before - learned_clause.literals.len()) as u64);
-                let new_before = learned_clause.literals.len();
+                    .add_term((num_literals_before - learned_nogood.literals.len()) as u64);
+                let new_before = learned_nogood.literals.len();
                 let context = MinimisationContext::new(
                     &self.assignments_integer,
                     &self.assignments_propositional,
@@ -897,17 +897,17 @@ impl ConstraintSatisfactionSolver {
                     &self.clausal_propagator,
                     &mut self.clause_allocator,
                 );
-                self.semantic_minimiser.minimise(context, learned_clause);
+                self.semantic_minimiser.minimise(context, learned_nogood);
                 self.counters
                     .average_number_of_literals_removed_semantic
-                    .add_term((new_before - learned_clause.literals.len()) as u64);
+                    .add_term((new_before - learned_nogood.literals.len()) as u64);
             }
             ClauseMinimisationStrategy::SemanticRecursive => {
-                self.semantic_minimiser.minimise(context, learned_clause);
+                self.semantic_minimiser.minimise(context, learned_nogood);
                 self.counters
                     .average_number_of_literals_removed_semantic
-                    .add_term((num_literals_before - learned_clause.literals.len()) as u64);
-                let new_before = learned_clause.literals.len();
+                    .add_term((num_literals_before - learned_nogood.literals.len()) as u64);
+                let new_before = learned_nogood.literals.len();
                 let context = MinimisationContext::new(
                     &self.assignments_integer,
                     &self.assignments_propositional,
@@ -917,19 +917,19 @@ impl ConstraintSatisfactionSolver {
                     &self.clausal_propagator,
                     &mut self.clause_allocator,
                 );
-                self.recursive_minimiser.minimise(context, learned_clause);
+                self.recursive_minimiser.minimise(context, learned_nogood);
                 self.counters
                     .average_number_of_literals_removed_recursive
-                    .add_term((new_before - learned_clause.literals.len()) as u64);
+                    .add_term((new_before - learned_nogood.literals.len()) as u64);
             }
         }
         self.counters
             .average_number_of_literals_removed_minimisation
-            .add_term((num_literals_before - learned_clause.literals.len()) as u64);
+            .add_term((num_literals_before - learned_nogood.literals.len()) as u64);
 
         recompute_invariants(
             PropagationContext::new(&self.assignments_integer, &self.assignments_propositional),
-            learned_clause,
+            learned_nogood,
         )
     }
 
@@ -946,29 +946,29 @@ impl ConstraintSatisfactionSolver {
     fn resolve_conflict(&mut self, brancher: &mut impl Brancher) {
         munchkin_assert_moderate!(self.state.conflicting());
 
-        let mut learned_clause = self.compute_learned_clause(brancher);
+        let mut learned_nogood = self.compute_learned_nogood(brancher);
         // We calculate some statistics and perform clause minimisation (before collecting the
         // statistics)
-        if let Some(learned_clause) = learned_clause.as_mut() {
-            self.minimise_learned_clause(learned_clause);
+        if let Some(learned_nogood) = learned_nogood.as_mut() {
+            self.minimise_learned_nogood(learned_nogood);
 
             self.counters
-                .average_learned_clause_lbd
+                .average_learned_nogood_lbd
                 .add_term(
-                    calculate_lbd(&learned_clause.literals, &self.assignments_propositional) as u64,
+                    calculate_lbd(&learned_nogood.literals, &self.assignments_propositional) as u64,
                 );
             self.counters
                 .average_backtrack_amount
-                .add_term((self.get_decision_level() - learned_clause.backjump_level) as u64);
+                .add_term((self.get_decision_level() - learned_nogood.backjump_level) as u64);
             self.counters
-                .average_learned_clause_length
-                .add_term(learned_clause.literals.len() as u64);
-            if learned_clause.literals.len() == 1 {
-                self.counters.num_unit_clauses_learned += 1;
+                .average_learned_nogood_length
+                .add_term(learned_nogood.literals.len() as u64);
+            if learned_nogood.literals.len() == 1 {
+                self.counters.num_unit_nogood_learned += 1;
             }
         }
 
-        let result = self.process_learned_clause(learned_clause, brancher);
+        let result = self.process_learned_nogood(learned_nogood, brancher);
 
         if result.is_err() {
             self.state.declare_infeasible();
@@ -977,7 +977,7 @@ impl ConstraintSatisfactionSolver {
         }
     }
 
-    fn compute_learned_clause(&mut self, brancher: &mut impl Brancher) -> Option<LearnedClause> {
+    fn compute_learned_nogood(&mut self, brancher: &mut impl Brancher) -> Option<LearnedNogood> {
         let mut conflict_analysis_context = ConflictAnalysisContext {
             assumptions: &self.assumptions,
             clausal_propagator: &mut self.clausal_propagator,
@@ -1001,9 +1001,9 @@ impl ConstraintSatisfactionSolver {
             .resolve_conflict(&mut conflict_analysis_context)
     }
 
-    fn process_learned_clause(
+    fn process_learned_nogood(
         &mut self,
-        learned_clause: Option<LearnedClause>,
+        learned_nogood: Option<LearnedNogood>,
         brancher: &mut impl Brancher,
     ) -> Result<(), ()> {
         let mut conflict_analysis_context = ConflictAnalysisContext {
@@ -1027,7 +1027,7 @@ impl ConstraintSatisfactionSolver {
         };
 
         self.conflict_resolver
-            .process(learned_clause, &mut conflict_analysis_context)
+            .process(learned_nogood, &mut conflict_analysis_context)
     }
 
     pub(crate) fn backtrack(&mut self, backtrack_level: usize, brancher: &mut impl Brancher) {
@@ -1402,10 +1402,10 @@ pub(crate) struct Counters {
     time_spent_in_solver: u64,
 
     pub(crate) average_conflict_size: CumulativeMovingAverage,
-    num_unit_clauses_learned: u64,
-    average_learned_clause_length: CumulativeMovingAverage,
+    num_unit_nogood_learned: u64,
+    average_learned_nogood_length: CumulativeMovingAverage,
     average_backtrack_amount: CumulativeMovingAverage,
-    average_learned_clause_lbd: CumulativeMovingAverage,
+    average_learned_nogood_lbd: CumulativeMovingAverage,
 
     average_number_of_literals_removed_semantic: CumulativeMovingAverage,
     average_number_of_literals_removed_recursive: CumulativeMovingAverage,
@@ -1418,23 +1418,23 @@ impl Counters {
         log_statistic("numberOfConflicts", self.num_conflicts);
         log_statistic("numberOfPropagations", self.num_propagations);
         log_statistic("timeSpentInSolverInMilliseconds", self.time_spent_in_solver);
+        log_statistic(
+            "averageBacktrackAmount",
+            self.average_backtrack_amount.value(),
+        );
 
         log_statistic(
             "averageSizeOfConflictExplanation",
             self.average_conflict_size.value(),
         );
-        log_statistic("numberOfLearnedUnitClauses", self.num_unit_clauses_learned);
+        log_statistic("numberOfLearnedUnitNogoods", self.num_unit_nogood_learned);
         log_statistic(
-            "averageLearnedClauseLength",
-            self.average_learned_clause_length.value(),
+            "averageLearnedNogoodLength",
+            self.average_learned_nogood_length.value(),
         );
         log_statistic(
-            "averageBacktrackAmount",
-            self.average_backtrack_amount.value(),
-        );
-        log_statistic(
-            "averageLearnedClauseLbd",
-            self.average_learned_clause_lbd.value(),
+            "averageLearnedNogoodLbd",
+            self.average_learned_nogood_lbd.value(),
         )
     }
 }

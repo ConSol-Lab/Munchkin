@@ -1,7 +1,8 @@
 use std::cmp::min;
 
-use super::LearnedClause;
+use super::LearnedNogood;
 use crate::basic_types::ClauseReference;
+use crate::basic_types::Conjunction;
 use crate::basic_types::ConstraintReference;
 use crate::basic_types::StoredConflictInfo;
 use crate::branching::Brancher;
@@ -68,14 +69,14 @@ impl ConflictAnalysisContext<'_> {
         );
     }
 
-    /// Adds the learned clause to the clausal propagator
+    /// Adds the learned nogood
     ///
-    /// Note that this method will not accept learned clauses with less than 1 literal
+    /// Note that this method will not accept learned nogoods with less than 1 literal
     #[allow(unused, reason = "will be used in an assignment")]
-    pub(crate) fn add_learned_clause(&mut self, learned_clause: LearnedClause) {
-        munchkin_assert_simple!(learned_clause.literals.len() > 1, "The learned clause should have at least 2 literals for it to be added to the clausal propagator");
+    pub(crate) fn add_learned_nogood(&mut self, learned_nogood: LearnedNogood) {
+        munchkin_assert_simple!(learned_nogood.literals.len() > 1, "The learned nogood should have at least 2 literals for it to be added to the clausal propagator");
         let _ = self.clausal_propagator.add_asserting_learned_clause(
-            learned_clause.literals,
+            learned_nogood.to_clause(),
             self.assignments_propositional,
             self.clause_allocator,
         );
@@ -154,15 +155,35 @@ impl ConflictAnalysisContext<'_> {
             .is_literal_root_assignment(literal)
     }
 
-    /// Returns the [`Literal`]s of the clause pointed to by the provided `clause_reference`
+    /// Returns the reason for the provided `literal` in the form `l_1 /\ ... /\ l_n -> literal`
     #[allow(unused, reason = "will be used in an assignment")]
-    pub(crate) fn get_literals_for_clause_reference(
-        &self,
-        clause_reference: ClauseReference,
-    ) -> &[Literal] {
-        self.clause_allocator[clause_reference].get_literal_slice()
+    pub(crate) fn get_reason(&mut self, literal: Literal) -> Conjunction {
+        let clause_reference = self.get_propagation_clause_reference(literal);
+        // 0-th literal is the propagated literal so it is skipped
+        self.clause_allocator[clause_reference].get_literal_slice()[1..]
+            .iter()
+            .copied()
+            .map(|literal| !literal)
+            .collect::<Vec<_>>()
+            .into()
     }
 
+    /// Returns the reason for the current conflict in the form `l_1 /\ ... /\ l_n -> false`
+    #[allow(unused, reason = "will be used in an assignment")]
+    pub(crate) fn get_conflict_nogood(&mut self) -> Conjunction {
+        let clause_reference = self.get_conflict_reason_clause_reference();
+        self.clause_allocator[clause_reference]
+            .get_literal_slice()
+            .iter()
+            .copied()
+            .map(|literal| !literal)
+            .collect::<Vec<_>>()
+            .into()
+    }
+}
+
+/// Private retrieval methods
+impl ConflictAnalysisContext<'_> {
     /// Given a propagated literal, returns a clause reference of the clause that propagates the
     /// literal. In case the literal was propagated by a clause, the propagating clause is
     /// returned. Otherwise, the literal was propagated by a propagator, in which case a new
@@ -172,11 +193,7 @@ impl ConflictAnalysisContext<'_> {
     /// kept, so asking about the reason for a root propagation will cause a panic.
     ///
     /// *Note* - The `0th` [`Literal`] in the clause represents the literal that was propagated.
-    #[allow(unused, reason = "will be used in an assignment")]
-    pub(crate) fn get_propagation_clause_reference(
-        &mut self,
-        propagated_literal: Literal,
-    ) -> ClauseReference {
+    fn get_propagation_clause_reference(&mut self, propagated_literal: Literal) -> ClauseReference {
         munchkin_assert_moderate!(
             !self
                 .assignments_propositional
@@ -217,8 +234,7 @@ impl ConflictAnalysisContext<'_> {
     /// constructed based on the explanation given by the propagator.
     ///
     /// Note that the solver will panic in case the solver is not in conflicting state.
-    #[allow(unused, reason = "will be used in an assignment")]
-    pub(crate) fn get_conflict_reason_clause_reference(&mut self) -> ClauseReference {
+    fn get_conflict_reason_clause_reference(&mut self) -> ClauseReference {
         match self.solver_state.get_conflict_info() {
             StoredConflictInfo::VirtualBinaryClause { lit1, lit2 } => self
                 .explanation_clause_manager

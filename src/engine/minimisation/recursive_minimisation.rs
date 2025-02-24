@@ -1,6 +1,6 @@
 use super::MinimisationContext;
 use super::Minimiser;
-use crate::engine::conflict_analysis::LearnedClause;
+use crate::engine::conflict_analysis::LearnedNogood;
 
 pub(crate) struct RecursiveMinimiser {
     // TODO
@@ -14,7 +14,7 @@ impl Default for RecursiveMinimiser {
 }
 
 impl Minimiser for RecursiveMinimiser {
-    fn minimise(&mut self, _context: MinimisationContext, _learned_clause: &mut LearnedClause) {
+    fn minimise(&mut self, _context: MinimisationContext, _learned_nogood: &mut LearnedNogood) {
         todo!()
     }
 }

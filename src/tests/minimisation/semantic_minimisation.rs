@@ -1,6 +1,6 @@
 #![cfg(test)]
 
-use crate::engine::conflict_analysis::LearnedClause;
+use crate::engine::conflict_analysis::LearnedNogood;
 use crate::engine::cp::reason::ReasonStore;
 use crate::engine::cp::AssignmentsInteger;
 use crate::engine::cp::VariableLiteralMappings;
@@ -102,13 +102,13 @@ pub(super) fn assert_elements_equal(first: Vec<Literal>, second: Vec<Literal>) {
     assert!(second.iter().all(|literal| first.contains(literal)));
 }
 
-fn predicates_to_literals(
+fn predicates_to_nogood(
     clause: Vec<Predicate>,
     variable_literal_mappings: &VariableLiteralMappings,
     assignments_integer: &AssignmentsInteger,
     assignments_propositional: &AssignmentsPropositional,
-) -> LearnedClause {
-    LearnedClause::new(
+) -> LearnedNogood {
+    LearnedNogood::new(
         clause
             .iter()
             .map(|predicate| {
@@ -131,12 +131,12 @@ fn simple_bound1() {
     let domain_0 = assignments_integer.get_domains().next().unwrap();
     let domain_1 = assignments_integer.get_domains().nth(1).unwrap();
     let clause: Vec<Predicate> = vec![
-        predicate![domain_0 <= 4],
-        predicate![domain_0 >= 10],
-        predicate![domain_1 <= -1],
-        predicate![domain_1 >= 5],
+        predicate![domain_0 >= 5],
+        predicate![domain_0 <= 9],
+        predicate![domain_1 >= 0],
+        predicate![domain_1 <= 4],
     ];
-    let mut learned_clause = predicates_to_literals(
+    let mut learned_nogood = predicates_to_nogood(
         clause,
         &variable_literal_mappings,
         &assignments_integer,
@@ -159,16 +159,16 @@ fn simple_bound1() {
         &mut clause_allocator,
     );
 
-    p.minimise(context, &mut learned_clause);
+    p.minimise(context, &mut learned_nogood);
 
-    assert_eq!(learned_clause.literals.len(), 3);
+    assert_eq!(learned_nogood.literals.len(), 3);
     assert_elements_equal(
-        learned_clause.literals,
-        predicates_to_literals(
+        learned_nogood.literals,
+        predicates_to_nogood(
             vec![
-                predicate![domain_0 <= 4],
-                predicate![domain_0 >= 10],
-                predicate![domain_1 >= 5],
+                predicate![domain_0 >= 5],
+                predicate![domain_0 <= 9],
+                predicate![domain_1 <= 4],
             ],
             &variable_literal_mappings,
             &assignments_integer,
@@ -187,13 +187,13 @@ fn simple_bound2() {
     let domain_1 = assignments_integer.get_domains().nth(1).unwrap();
 
     let clause = vec![
-        predicate![domain_0 <= 4],
-        predicate![domain_0 >= 10],
-        predicate![domain_1 <= -1],
-        predicate![domain_1 >= 5],
-        predicate![domain_0 == 7],
+        predicate![domain_0 >= 5],
+        predicate![domain_0 <= 9],
+        predicate![domain_1 >= 0],
+        predicate![domain_1 <= 4],
+        predicate![domain_0 != 7],
     ];
-    let mut learned_clause = predicates_to_literals(
+    let mut learned_nogood = predicates_to_nogood(
         clause,
         &variable_literal_mappings,
         &assignments_integer,
@@ -216,17 +216,17 @@ fn simple_bound2() {
         &mut clause_allocator,
     );
 
-    p.minimise(context, &mut learned_clause);
+    p.minimise(context, &mut learned_nogood);
 
-    assert_eq!(learned_clause.literals.len(), 4);
+    assert_eq!(learned_nogood.literals.len(), 4);
     assert_elements_equal(
-        learned_clause.literals,
-        predicates_to_literals(
+        learned_nogood.literals,
+        predicates_to_nogood(
             vec![
-                predicate![domain_0 <= 4],
-                predicate![domain_0 >= 10],
-                predicate![domain_1 >= 5],
-                predicate![domain_0 == 7],
+                predicate![domain_0 >= 5],
+                predicate![domain_0 <= 9],
+                predicate![domain_1 <= 4],
+                predicate![domain_0 != 7],
             ],
             &variable_literal_mappings,
             &assignments_integer,
@@ -245,16 +245,16 @@ fn simple_bound3() {
     let domain_1 = assignments_integer.get_domains().nth(1).unwrap();
 
     let clause = vec![
-        predicate![domain_0 <= 4],
-        predicate![domain_0 >= 10],
-        predicate![domain_1 <= -1],
-        predicate![domain_1 >= 5],
-        predicate![domain_0 == 7],
-        predicate![domain_0 == 7],
-        predicate![domain_0 == 8],
-        predicate![domain_0 == 6],
+        predicate![domain_0 >= 5],
+        predicate![domain_0 <= 9],
+        predicate![domain_1 >= 0],
+        predicate![domain_1 <= 4],
+        predicate![domain_0 != 7],
+        predicate![domain_0 != 7],
+        predicate![domain_0 != 8],
+        predicate![domain_0 != 6],
     ];
-    let mut learned_clause = predicates_to_literals(
+    let mut learned_nogood = predicates_to_nogood(
         clause,
         &variable_literal_mappings,
         &assignments_integer,
@@ -277,19 +277,19 @@ fn simple_bound3() {
         &mut clause_allocator,
     );
 
-    p.minimise(context, &mut learned_clause);
+    p.minimise(context, &mut learned_nogood);
 
-    assert_eq!(learned_clause.literals.len(), 6);
+    assert_eq!(learned_nogood.literals.len(), 6);
     assert_elements_equal(
-        learned_clause.literals,
-        predicates_to_literals(
+        learned_nogood.literals,
+        predicates_to_nogood(
             vec![
-                predicate![domain_0 <= 4],
-                predicate![domain_0 >= 10],
-                predicate![domain_1 >= 5],
-                predicate![domain_0 == 7],
-                predicate![domain_0 == 6],
-                predicate![domain_0 == 8],
+                predicate![domain_0 >= 5],
+                predicate![domain_0 <= 9],
+                predicate![domain_1 <= 4],
+                predicate![domain_0 != 7],
+                predicate![domain_0 != 6],
+                predicate![domain_0 != 8],
             ],
             &variable_literal_mappings,
             &assignments_integer,
@@ -308,17 +308,17 @@ fn simple_assign() {
     let domain_1 = assignments_integer.get_domains().nth(1).unwrap();
 
     let clause = vec![
-        predicate![domain_0 <= 4],
-        predicate![domain_0 >= 10],
-        predicate![domain_1 <= -1],
-        predicate![domain_1 >= 5],
-        predicate![domain_0 == 7],
-        predicate![domain_0 == 7],
-        predicate![domain_0 == 6],
-        predicate![domain_0 != 5],
-        predicate![domain_0 == 7],
+        predicate![domain_0 >= 5],
+        predicate![domain_0 <= 9],
+        predicate![domain_1 >= 0],
+        predicate![domain_1 <= 4],
+        predicate![domain_0 != 7],
+        predicate![domain_0 != 7],
+        predicate![domain_0 != 6],
+        predicate![domain_0 == 5],
+        predicate![domain_0 != 7],
     ];
-    let mut learned_clause = predicates_to_literals(
+    let mut learned_nogood = predicates_to_nogood(
         clause,
         &variable_literal_mappings,
         &assignments_integer,
@@ -340,13 +340,13 @@ fn simple_assign() {
         &mut clause_allocator,
     );
 
-    p.minimise(context, &mut learned_clause);
+    p.minimise(context, &mut learned_nogood);
 
-    assert_eq!(learned_clause.literals.len(), 2);
+    assert_eq!(learned_nogood.literals.len(), 2);
     assert_elements_equal(
-        learned_clause.literals,
-        predicates_to_literals(
-            vec![predicate![domain_0 != 5], predicate![domain_1 >= 5]],
+        learned_nogood.literals,
+        predicates_to_nogood(
+            vec![predicate![domain_0 == 5], predicate![domain_1 <= 4]],
             &variable_literal_mappings,
             &assignments_integer,
             &assignments_propositional,
@@ -362,11 +362,11 @@ fn simple_lb_override1() {
         create_for_testing(1, 0, None);
     let domain_id = assignments_integer.get_domains().next().unwrap();
     let clause = vec![
-        predicate![domain_id <= 1],
-        predicate![domain_id <= 0],
-        predicate![domain_id <= 4],
+        predicate![domain_id >= 2],
+        predicate![domain_id >= 1],
+        predicate![domain_id >= 5],
     ];
-    let mut learned_clause = predicates_to_literals(
+    let mut learned_nogood = predicates_to_nogood(
         clause,
         &variable_literal_mappings,
         &assignments_integer,
@@ -388,11 +388,11 @@ fn simple_lb_override1() {
         &mut clause_allocator,
     );
 
-    p.minimise(context, &mut learned_clause);
+    p.minimise(context, &mut learned_nogood);
 
-    assert_eq!(learned_clause.literals.len(), 1);
+    assert_eq!(learned_nogood.literals.len(), 1);
     assert_eq!(
-        learned_clause.literals[0],
+        learned_nogood.literals[0],
         variable_literal_mappings.get_literal(
             predicate!(domain_id >= 5).try_into().unwrap(),
             &assignments_propositional,
@@ -408,12 +408,12 @@ fn hole_lb_override() {
         create_for_testing(1, 0, None);
     let domain_id = assignments_integer.get_domains().next().unwrap();
     let clause = vec![
-        predicate![domain_id == 2],
-        predicate![domain_id == 3],
-        predicate![domain_id <= 4],
-        predicate![domain_id <= 4],
+        predicate![domain_id != 2],
+        predicate![domain_id != 3],
+        predicate![domain_id >= 5],
+        predicate![domain_id >= 1],
     ];
-    let mut learned_clause = predicates_to_literals(
+    let mut learned_nogood = predicates_to_nogood(
         clause,
         &variable_literal_mappings,
         &assignments_integer,
@@ -436,13 +436,13 @@ fn hole_lb_override() {
         &mut clause_allocator,
     );
 
-    p.minimise(context, &mut learned_clause);
+    p.minimise(context, &mut learned_nogood);
 
-    assert_eq!(learned_clause.literals.len(), 1);
+    assert_eq!(learned_nogood.literals.len(), 1);
     assert_elements_equal(
-        learned_clause.literals,
-        predicates_to_literals(
-            vec![predicate!(domain_id <= 4)],
+        learned_nogood.literals,
+        predicates_to_nogood(
+            vec![predicate!(domain_id >= 5)],
             &variable_literal_mappings,
             &assignments_integer,
             &assignments_propositional,
@@ -458,12 +458,12 @@ fn hole_push_lb() {
         create_for_testing(1, 0, None);
     let domain_id = assignments_integer.get_domains().next().unwrap();
     let clause = vec![
-        predicate![domain_id == 2],
-        predicate![domain_id == 3],
-        predicate![domain_id <= 0],
-        predicate![domain_id == 1],
+        predicate![domain_id != 2],
+        predicate![domain_id != 3],
+        predicate![domain_id >= 1],
+        predicate![domain_id != 1],
     ];
-    let mut learned_clause = predicates_to_literals(
+    let mut learned_nogood = predicates_to_nogood(
         clause,
         &variable_literal_mappings,
         &assignments_integer,
@@ -486,13 +486,13 @@ fn hole_push_lb() {
         &mut clause_allocator,
     );
 
-    p.minimise(context, &mut learned_clause);
+    p.minimise(context, &mut learned_nogood);
 
-    assert_eq!(learned_clause.literals.len(), 1);
+    assert_eq!(learned_nogood.literals.len(), 1);
     assert_elements_equal(
-        learned_clause.literals,
-        predicates_to_literals(
-            vec![predicate![domain_id <= 3]],
+        learned_nogood.literals,
+        predicates_to_nogood(
+            vec![predicate![domain_id >= 4]],
             &variable_literal_mappings,
             &assignments_integer,
             &assignments_propositional,

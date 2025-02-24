@@ -1,5 +1,6 @@
 mod clause_reference;
 mod conflict_info;
+mod conjunction;
 mod constraint_operation_error;
 mod constraint_reference;
 mod csp_solver_execution_flag;
@@ -15,6 +16,7 @@ mod trail;
 
 pub(crate) use clause_reference::ClauseReference;
 pub(crate) use conflict_info::*;
+pub(crate) use conjunction::Conjunction;
 pub use constraint_operation_error::ConstraintOperationError;
 pub(crate) use constraint_reference::ConstraintReference;
 pub(crate) use csp_solver_execution_flag::CSPSolverExecutionFlag;

@@ -1,6 +1,6 @@
 #![cfg(test)]
 
-use crate::engine::conflict_analysis::LearnedClause;
+use crate::engine::conflict_analysis::LearnedNogood;
 use crate::engine::minimisation::MinimisationContext;
 use crate::engine::minimisation::Minimiser;
 use crate::engine::minimisation::RecursiveMinimiser;
@@ -99,7 +99,7 @@ fn test_recursive_minimisation() {
     let result = solver.propagate_clausal_propagator();
     assert!(result.is_err());
 
-    let mut learned_clause = LearnedClause::new(vec![!p, !j, !k, !i, !m, !r, !l, !q], 2);
+    let mut learned_nogood = LearnedNogood::new(vec![p, j, k, i, m, r, l, q], 2);
 
     let mut explanation_clause_manager = ExplanationClauseManager::default();
     let context = MinimisationContext::new(
@@ -111,7 +111,7 @@ fn test_recursive_minimisation() {
         &solver.clausal_propagator,
         &mut solver.clause_allocator,
     );
-    minimiser.minimise(context, &mut learned_clause);
+    minimiser.minimise(context, &mut learned_nogood);
 
-    assert_elements_equal(learned_clause.literals, vec![!p, !j, !k, !i, !r, !q])
+    assert_elements_equal(learned_nogood.literals, vec![p, j, k, i, r, q])
 }

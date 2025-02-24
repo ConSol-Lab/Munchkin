@@ -64,7 +64,7 @@ fn test_1uip() {
     }
 
     let mut resolver = UniqueImplicationPoint::default();
-    let learned_clause = resolver
+    let learned_nogood = resolver
         .resolve_conflict(&mut ConflictAnalysisContext {
             clausal_propagator: &mut solver.clausal_propagator,
             variable_literal_mappings: &solver.variable_literal_mappings,
@@ -90,7 +90,7 @@ fn test_1uip() {
         })
         .expect("Expected learned clause to be returned");
 
-    assert_eq!(learned_clause.literals.len(), 2);
-    assert_eq!(learned_clause.literals, vec![!x4, x21]);
-    assert_eq!(learned_clause.backjump_level, 1);
+    assert_eq!(learned_nogood.literals.len(), 2);
+    assert_eq!(learned_nogood.literals, vec![x4, !x21]);
+    assert_eq!(learned_nogood.backjump_level, 1);
 }

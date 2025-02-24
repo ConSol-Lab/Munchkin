@@ -1,6 +1,6 @@
 use super::MinimisationContext;
 use super::Minimiser;
-use crate::engine::conflict_analysis::LearnedClause;
+use crate::engine::conflict_analysis::LearnedNogood;
 
 pub(crate) struct SemanticMinimiser {
     // TODO
@@ -14,7 +14,7 @@ impl Default for SemanticMinimiser {
 }
 
 impl Minimiser for SemanticMinimiser {
-    fn minimise(&mut self, _context: MinimisationContext, _learned_clause: &mut LearnedClause) {
+    fn minimise(&mut self, _context: MinimisationContext, _learned_nogood: &mut LearnedNogood) {
         todo!()
     }
 }

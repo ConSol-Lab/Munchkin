@@ -13,12 +13,13 @@ STATISTICS = [
     "objective",
     "numberOfDecisions",
     "numberOfConflicts",
-    "averageSizeOfConflictExplanation",
     "numberOfPropagations",
-    "numberOfLearnedUnitClauses",
-    "averageLearnedClauseLength",
     "timeSpentInSolverInMilliseconds",
     "averageBacktrackAmount",
+    "averageSizeOfConflictExplanation",
+    "numberOfLearnedUnitNogoods",
+    "averageLearnedNogoodLength",
+    "averageLearnedNogoodLbd",
 ];
 
 
