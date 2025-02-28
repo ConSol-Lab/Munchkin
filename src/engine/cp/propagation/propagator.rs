@@ -1,8 +1,8 @@
 use super::PropagatorInitialisationContext;
 #[cfg(doc)]
-use crate::asserts::munchkin_assert_ADVANCED;
+use crate::asserts::ASSERT_ADVANCED;
 #[cfg(doc)]
-use crate::asserts::munchkin_assert_EXTREME;
+use crate::asserts::ASSERT_EXTREME;
 #[cfg(doc)]
 use crate::basic_types::Inconsistency;
 use crate::basic_types::PropagationStatusCP;
