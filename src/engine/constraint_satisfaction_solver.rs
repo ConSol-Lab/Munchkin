@@ -983,6 +983,41 @@ impl ConstraintSatisfactionSolver {
         }
     }
 
+    pub(crate) fn extract_core(&mut self, brancher: &mut impl Brancher) -> Vec<Literal> {
+        let core = self.get_core(brancher);
+        if !self.state.is_infeasible() {
+            self.restore_state_at_root(brancher);
+        }
+
+        core
+    }
+
+    fn get_core(&mut self, brancher: &mut impl Brancher) -> Vec<Literal> {
+        let mut conflict_analysis_context = ConflictAnalysisContext {
+            assumptions: &self.assumptions,
+            clausal_propagator: &mut self.clausal_propagator,
+            variable_literal_mappings: &self.variable_literal_mappings,
+            assignments_integer: &mut self.assignments_integer,
+            assignments_propositional: &mut self.assignments_propositional,
+            internal_parameters: &self.internal_parameters,
+            solver_state: &mut self.state,
+            brancher,
+            clause_allocator: &mut self.clause_allocator,
+            explanation_clause_manager: &mut self.explanation_clause_manager,
+            reason_store: &mut self.reason_store,
+            counters: &mut self.counters,
+            propositional_trail_index: &mut self.propositional_trail_index,
+            propagator_queue: &mut self.propagator_queue,
+            watch_list_cp: &mut self.watch_list_cp,
+            sat_trail_synced_position: &mut self.sat_trail_synced_position,
+            cp_trail_synced_position: &mut self.cp_trail_synced_position,
+        };
+        let core = AllDecisionLearning::default()
+            .resolve_conflict(&mut conflict_analysis_context)
+            .expect("Expected all-decision learning to be able to produce a core");
+        core.literals
+    }
+
     /// Changes the state based on the conflict analysis result (stored in
     /// [`ConstraintSatisfactionSolver::analysis_result`]). It performs the following:
     /// - Adds the learned clause to the database
