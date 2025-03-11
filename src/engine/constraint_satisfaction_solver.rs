@@ -456,6 +456,9 @@ impl ConstraintSatisfactionSolver {
         let result = self.solve_internal(termination, brancher);
 
         self.counters.time_spent_in_solver += start_time.elapsed().as_millis() as u64;
+        self.counters
+            .average_time_in_call
+            .add_term(start_time.elapsed().as_millis() as u64);
 
         result
     }
@@ -1491,7 +1494,8 @@ impl CumulativeMovingAverage {
 /// [`ConstraintSatisfactionSolver`].
 #[derive(Default, Debug, Copy, Clone)]
 pub(crate) struct Counters {
-    pub(crate) num_calls_to_solve: u64,
+    num_calls_to_solve: u64,
+    average_time_in_call: CumulativeMovingAverage,
 
     pub(crate) num_decisions: u64,
     pub(crate) num_conflicts: u64,
@@ -1507,11 +1511,21 @@ pub(crate) struct Counters {
     average_number_of_literals_removed_semantic: CumulativeMovingAverage,
     average_number_of_literals_removed_recursive: CumulativeMovingAverage,
     average_number_of_literals_removed_minimisation: CumulativeMovingAverage,
+
+    pub(crate) average_core_size: CumulativeMovingAverage,
+    pub(crate) average_number_of_literals_removed_by_core_minimisation: CumulativeMovingAverage,
+
+    pub(crate) number_of_generated_cuts: u64,
+    pub(crate) average_size_of_cuts: CumulativeMovingAverage,
 }
 
 impl Counters {
     fn log_statistics(&self) {
         log_statistic("numberOfCallsToSolve", self.num_calls_to_solve);
+        log_statistic(
+            "averageTimePerCallToSolve",
+            self.average_time_in_call.value(),
+        );
 
         log_statistic("numberOfDecisions", self.num_decisions);
         log_statistic("numberOfConflicts", self.num_conflicts);
@@ -1548,6 +1562,16 @@ impl Counters {
             "averageNumberOfLiteralsRemovedNogoodMinimisation",
             self.average_number_of_literals_removed_minimisation.value(),
         );
+
+        log_statistic("averageCoreSize", self.average_core_size.value());
+        log_statistic(
+            "averageNumberOfLiteralsRemovedCoreMinimisation",
+            self.average_number_of_literals_removed_by_core_minimisation
+                .value(),
+        );
+
+        log_statistic("numberOfGeneratedCuts", self.number_of_generated_cuts);
+        log_statistic("averageSizeOfCuts", self.average_size_of_cuts.value());
     }
 }
 
