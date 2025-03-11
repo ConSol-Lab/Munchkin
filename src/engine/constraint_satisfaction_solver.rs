@@ -1517,10 +1517,6 @@ impl Counters {
         log_statistic("numberOfConflicts", self.num_conflicts);
         log_statistic("numberOfPropagations", self.num_propagations);
         log_statistic("timeSpentInSolverInMilliseconds", self.time_spent_in_solver);
-        log_statistic(
-            "averageBacktrackAmount",
-            self.average_backtrack_amount.value(),
-        );
 
         log_statistic(
             "averageSizeOfConflictExplanation",
@@ -1532,9 +1528,26 @@ impl Counters {
             self.average_learned_nogood_length.value(),
         );
         log_statistic(
+            "averageBacktrackAmount",
+            self.average_backtrack_amount.value(),
+        );
+        log_statistic(
             "averageLearnedNogoodLbd",
             self.average_learned_nogood_lbd.value(),
-        )
+        );
+
+        log_statistic(
+            "averageNumberOfLiteralsRemovedSemantic",
+            self.average_number_of_literals_removed_semantic.value(),
+        );
+        log_statistic(
+            "averageNumberOfLiteralsRemovedRecursive",
+            self.average_number_of_literals_removed_recursive.value(),
+        );
+        log_statistic(
+            "averageNumberOfLiteralsRemovedNogoodMinimisation",
+            self.average_number_of_literals_removed_minimisation.value(),
+        );
     }
 }
 
