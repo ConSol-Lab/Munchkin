@@ -985,6 +985,7 @@ impl ConstraintSatisfactionSolver {
 
     pub(crate) fn extract_core(&mut self, brancher: &mut impl Brancher) -> Vec<Literal> {
         let core = self.get_core(brancher);
+
         if !self.state.is_infeasible() {
             self.restore_state_at_root(brancher);
         }

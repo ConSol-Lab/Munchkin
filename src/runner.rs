@@ -13,6 +13,8 @@ use crate::model::Model;
 use crate::model::Output;
 use crate::model::VariableMap;
 use crate::optimisation::linear_sat_unsat::LinearSatUnsat;
+use crate::optimisation::CoreGuidedSearch;
+use crate::optimisation::LinearUnsatSat;
 use crate::optimisation::OptimisationStrategy;
 use crate::options::SolverOptions;
 use crate::results::OptimisationResult;
@@ -207,8 +209,16 @@ pub fn solve<SearchStrategies>(
             &mut time_budget,
             LinearSatUnsat::new(Minimise, objective_variable, solution_callback),
         ),
-        OptimisationStrategy::LinearUnsatSat => todo!(),
-        OptimisationStrategy::CoreGuided => todo!(),
+        OptimisationStrategy::LinearUnsatSat => solver.optimise(
+            &mut brancher,
+            &mut time_budget,
+            LinearUnsatSat::new(Minimise, objective_variable, solution_callback),
+        ),
+        OptimisationStrategy::CoreGuided => solver.optimise(
+            &mut brancher,
+            &mut time_budget,
+            CoreGuidedSearch::new(Minimise, vec![objective_variable], solution_callback),
+        ),
         OptimisationStrategy::LBBD => todo!(),
     };
 

@@ -12,6 +12,10 @@ use crate::Solver;
 
 pub mod linear_sat_unsat;
 pub use linear_sat_unsat::*;
+pub mod linear_unsat_sat;
+pub use linear_unsat_sat::*;
+pub(crate) mod core_guided;
+pub(crate) use core_guided::*;
 
 pub trait OptimisationProcedure<Callback: Fn(&Solver, SolutionReference)> {
     fn optimise(
