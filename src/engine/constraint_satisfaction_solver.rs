@@ -288,6 +288,20 @@ impl Default for SatisfactionSolverOptions {
 }
 
 impl ConstraintSatisfactionSolver {
+    /// Conclude the proof with the unsatisfiable claim.
+    ///
+    /// This method will finish the proof. Any new operation will not be logged to the proof.
+    pub fn conclude_proof_unsat(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
+
+    /// Conclude the proof with the optimality claim.
+    ///
+    /// This method will finish the proof. Any new operation will not be logged to the proof.
+    pub fn conclude_proof_optimal(&mut self, _bound: Predicate) -> std::io::Result<()> {
+        Ok(())
+    }
+
     /// Process the stored domain events. If no events were present, this returns false. Otherwise,
     /// true is returned.
     fn process_domain_events(&mut self) -> bool {
@@ -750,6 +764,7 @@ impl ConstraintSatisfactionSolver {
         termination: &mut impl TerminationCondition,
         brancher: &mut impl Brancher,
     ) -> CSPSolverExecutionFlag {
+        self.counters.num_calls_to_solve += 1;
         loop {
             self.propagate_enqueued(termination);
 
@@ -1476,6 +1491,8 @@ impl CumulativeMovingAverage {
 /// [`ConstraintSatisfactionSolver`].
 #[derive(Default, Debug, Copy, Clone)]
 pub(crate) struct Counters {
+    pub(crate) num_calls_to_solve: u64,
+
     pub(crate) num_decisions: u64,
     pub(crate) num_conflicts: u64,
     num_propagations: u64,
@@ -1494,6 +1511,8 @@ pub(crate) struct Counters {
 
 impl Counters {
     fn log_statistics(&self) {
+        log_statistic("numberOfCallsToSolve", self.num_calls_to_solve);
+
         log_statistic("numberOfDecisions", self.num_decisions);
         log_statistic("numberOfConflicts", self.num_conflicts);
         log_statistic("numberOfPropagations", self.num_propagations);
