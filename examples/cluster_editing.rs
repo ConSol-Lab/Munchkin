@@ -87,7 +87,7 @@ impl Problem<SearchStrategies> for ClusterEditing {
             terms: terms
                 .clone()
                 .into_iter()
-                .chain(std::iter::once(cost))
+                .chain(std::iter::once(cost.scaled(-1)))
                 .collect::<Vec<_>>(),
             rhs: 0,
         });

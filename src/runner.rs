@@ -275,7 +275,7 @@ fn print_output(output: &Output, solver_variables: &VariableMap, solution: &Solu
                 } else {
                     print!(" | ");
                 }
-                for variable in for_i.iter() {
+                for (var_index, variable) in for_i.iter().enumerate() {
                     let value = solution.get_integer_value(variable.clone());
 
                     if value == 0 {
@@ -285,9 +285,13 @@ fn print_output(output: &Output, solver_variables: &VariableMap, solution: &Solu
                     } else {
                         panic!("For now we have just implemented this for 2D boolean arrays")
                     }
+                    if var_index < for_i.len() - 1 {
+                        print!(", ");
+                    }
                 }
+                println!("");
             }
-            println!("];");
+            println!("|];");
         }
     }
 }

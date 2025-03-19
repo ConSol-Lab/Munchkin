@@ -84,8 +84,8 @@ impl Model {
         (0..len).for_each(|i| {
             let _ = self.new_interval_variable(format!("{name}[{i}]"), lower_bound, upper_bound);
         });
-
         let end = self.variables.len();
+
         self.two_dimensional_arrays
             .push((name.to_string(), (start..end, num_columns)));
 
