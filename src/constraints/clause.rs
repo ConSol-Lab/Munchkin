@@ -1,3 +1,5 @@
+use std::num::NonZero;
+
 use super::Constraint;
 use super::NegatableConstraint;
 use crate::variables::Literal;
@@ -21,7 +23,7 @@ pub fn conjunction(literals: impl Into<Vec<Literal>>) -> impl NegatableConstrain
 struct Clause(Vec<Literal>);
 
 impl Constraint for Clause {
-    fn post(self, solver: &mut Solver) -> Result<(), ConstraintOperationError> {
+    fn post(self, solver: &mut Solver, _: NonZero<u32>) -> Result<(), ConstraintOperationError> {
         solver.add_clause(self.0)
     }
 
@@ -29,6 +31,7 @@ impl Constraint for Clause {
         self,
         solver: &mut Solver,
         reification_literal: Literal,
+        _: NonZero<u32>,
     ) -> Result<(), ConstraintOperationError> {
         solver.add_clause(
             self.0
@@ -49,7 +52,7 @@ impl NegatableConstraint for Clause {
 struct Conjunction(Vec<Literal>);
 
 impl Constraint for Conjunction {
-    fn post(self, solver: &mut Solver) -> Result<(), ConstraintOperationError> {
+    fn post(self, solver: &mut Solver, _: NonZero<u32>) -> Result<(), ConstraintOperationError> {
         self.0
             .into_iter()
             .try_for_each(|lit| solver.add_clause([lit]))
@@ -59,6 +62,7 @@ impl Constraint for Conjunction {
         self,
         solver: &mut Solver,
         reification_literal: Literal,
+        _: NonZero<u32>,
     ) -> Result<(), ConstraintOperationError> {
         self.0
             .into_iter()

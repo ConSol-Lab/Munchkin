@@ -1,4 +1,5 @@
 use std::fmt::Display;
+use std::num::NonZero;
 use std::ops::Range;
 
 use clap::ValueEnum;
@@ -6,7 +7,10 @@ use clap::ValueEnum;
 use crate::constraints;
 use crate::constraints::CumulativeImpl;
 use crate::constraints::SubCircuitElimination;
+use crate::encodings;
+use crate::engine::cp::AssignmentsInteger;
 use crate::options::SolverOptions;
+use crate::termination::TerminationCondition;
 use crate::variables::AffineView;
 use crate::variables::DomainId;
 use crate::variables::TransformableVariable;
@@ -100,11 +104,37 @@ impl Model {
         self.constraints.push(constraint);
     }
 
+    pub fn to_assignment(&self) -> (AssignmentsInteger, VariableMap) {
+        let mut assignment = AssignmentsInteger::default();
+
+        let (variables, names): (Vec<_>, Vec<_>) = self
+            .variables
+            .iter()
+            .map(|(name, lower_bound, upper_bound)| {
+                (
+                    AffineView::from(assignment.grow(*lower_bound, *upper_bound)),
+                    name.clone(),
+                )
+            })
+            .unzip();
+
+        let solver_variables = VariableMap {
+            variables,
+            names,
+            arrays: self.arrays.clone(),
+            two_dimensional_arrays: self.two_dimensional_arrays.clone(),
+        };
+
+        (assignment, solver_variables)
+    }
+
     /// Create a solver instance from this model.
     pub fn into_solver(
         self,
         solver_options: SolverOptions,
         use_global_propagator: impl Fn(Globals) -> bool,
+        linear_encoding: Option<LinearEncoding>,
+        termination: &mut impl TerminationCondition,
     ) -> (Solver, VariableMap) {
         let mut solver = Solver::with_options(solver_options);
 
@@ -134,10 +164,18 @@ impl Model {
             self.constraints,
             &solver_variables,
             use_global_propagator,
+            linear_encoding,
             &mut solver,
+            termination,
         );
 
         (solver, solver_variables)
+    }
+
+    /// Get the constraint identified by the given id. If the ID does not point to a constraint,
+    /// this returns `None`.
+    pub(crate) fn get_constraint_by_id(&self, constraint_id: NonZero<u32>) -> Option<&Constraint> {
+        self.constraints.get(constraint_id.get() as usize - 1)
     }
 }
 
@@ -145,11 +183,19 @@ fn add_constraints(
     constraints: Vec<Constraint>,
     solver_variables: &VariableMap,
     use_global_propagator: impl Fn(Globals) -> bool,
+    linear_encoding: Option<LinearEncoding>,
     solver: &mut Solver,
+    termination: &mut impl TerminationCondition,
 ) -> Result<(), ConstraintOperationError> {
     let to_solver_variable = |int_var: IntVariable| solver_variables.to_solver_variable(int_var);
 
-    for constraint in constraints {
+    for (idx, constraint) in constraints.into_iter().enumerate() {
+        if termination.should_stop() {
+            return Ok(());
+        }
+
+        let tag = NonZero::new(idx as u32 + 1).unwrap();
+
         match constraint {
             Constraint::Circuit(variables) => {
                 let variables: Vec<_> = variables.into_iter().map(to_solver_variable).collect();
@@ -173,40 +219,46 @@ fn add_constraints(
                         !use_global_propagator(Globals::AllDifferent),
                         !use_global_propagator(Globals::Element),
                     ))
-                    .post()?;
+                    .post(tag)?;
             }
             Constraint::Element { array, index, rhs } => {
+                let array: Vec<_> = array.into_iter().map(to_solver_variable).collect();
                 let index = to_solver_variable(index);
                 let rhs = to_solver_variable(rhs);
-
-                let array: Vec<_> = array
-                    .into_iter()
-                    .map(|element| AffineView::from(solver.new_bounded_integer(element, element)))
-                    .collect();
 
                 if use_global_propagator(Globals::Element) {
                     solver
                         .add_constraint(constraints::element(index, array, rhs))
-                        .post()?;
+                        .post(tag)?;
                 } else {
                     solver
                         .add_constraint(constraints::element_decomposition(index, array, rhs))
-                        .post()?;
+                        .post(tag)?;
                 }
             }
             Constraint::LinearEqual { terms, rhs } => {
                 let terms: Vec<_> = terms.into_iter().map(to_solver_variable).collect();
 
-                solver
-                    .add_constraint(constraints::equals(terms, rhs))
-                    .post()?;
+                match linear_encoding {
+                    Some(encoding) => solver
+                        .add_constraint(encodings::equals(terms, rhs, encoding))
+                        .post(tag)?,
+                    None => solver
+                        .add_constraint(constraints::equals(terms, rhs))
+                        .post(tag)?,
+                }
             }
             Constraint::LinearLessEqual { terms, rhs } => {
                 let terms: Vec<_> = terms.into_iter().map(to_solver_variable).collect();
 
-                solver
-                    .add_constraint(constraints::less_than_or_equals(terms, rhs))
-                    .post()?;
+                match linear_encoding {
+                    Some(encoding) => solver
+                        .add_constraint(encodings::less_than_or_equals(terms, rhs, encoding))
+                        .post(tag)?,
+                    None => solver
+                        .add_constraint(constraints::less_than_or_equals(terms, rhs))
+                        .post(tag)?,
+                }
             }
             Constraint::Cumulative {
                 start_times,
@@ -237,7 +289,7 @@ fn add_constraints(
                         resource_requirements,
                         resource_capacity,
                     ))
-                    .post()?;
+                    .post(tag)?;
             }
             Constraint::Maximum { terms, rhs } => {
                 let terms: Vec<_> = terms.into_iter().map(to_solver_variable).collect();
@@ -246,11 +298,11 @@ fn add_constraints(
                 if use_global_propagator(Globals::Maximum) {
                     let _ = solver
                         .add_constraint(constraints::maximum(terms, rhs))
-                        .post();
+                        .post(tag);
                 } else {
                     let _ = solver
                         .add_constraint(constraints::maximum_decomposition(terms, rhs))
-                        .post();
+                        .post(tag);
                 }
             }
         }
@@ -264,7 +316,7 @@ fn add_constraints(
 pub enum Constraint {
     Circuit(Vec<IntVariable>),
     Element {
-        array: Vec<i32>,
+        array: Vec<IntVariable>,
         index: IntVariable,
         rhs: IntVariable,
     },
@@ -286,6 +338,19 @@ pub enum Constraint {
         terms: Vec<IntVariable>,
         rhs: IntVariable,
     },
+}
+
+impl Constraint {
+    pub fn name(&self) -> &str {
+        match self {
+            Constraint::Circuit(_) => "circuit",
+            Constraint::Element { .. } => "element",
+            Constraint::LinearEqual { .. } => "linear_equal",
+            Constraint::LinearLessEqual { .. } => "linear_less_equal",
+            Constraint::Cumulative { .. } => "cumulative",
+            Constraint::Maximum { .. } => "maximum",
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -369,6 +434,13 @@ pub struct VariableMap {
 }
 
 impl VariableMap {
+    pub fn get_named_variable(&self, name: &str) -> Option<AffineView<DomainId>> {
+        self.names
+            .iter()
+            .position(|n| n == name)
+            .map(|index| self.variables[index].clone())
+    }
+
     pub fn to_solver_variable(&self, int_var: IntVariable) -> AffineView<DomainId> {
         self.variables[int_var.id]
             .scaled(int_var.scale)
@@ -445,4 +517,10 @@ pub enum Globals {
     ForwardCheckingCircuit,
     TimeTableCumulative,
     EnergeticReasoningCumulative,
+}
+
+#[derive(Clone, Copy, Debug, ValueEnum, PartialEq, Eq)]
+pub enum LinearEncoding {
+    Totalizer,
+    SequentialSums,
 }

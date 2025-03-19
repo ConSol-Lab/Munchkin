@@ -15,7 +15,10 @@ use super::predicates::integer_predicate::IntegerPredicate;
 use super::predicates::integer_predicate::IntegerPredicateConversionError;
 use super::sat::ClauseAllocator;
 #[cfg(any(feature = "explanation-checks", test))]
+use super::termination::TerminationCondition;
+#[cfg(any(feature = "explanation-checks", test))]
 use crate::basic_types::HashSet;
+use crate::basic_types::KeyedVec;
 #[cfg(any(feature = "explanation-checks", test))]
 use crate::basic_types::PropositionalConjunction;
 use crate::engine::cp::propagation::PropagationContextMut;
@@ -62,7 +65,7 @@ impl DebugHelper {
         assignments_integer: &AssignmentsInteger,
         assignments_propositional: &AssignmentsPropositional,
         clause_allocator: &ClauseAllocator,
-        propagators_cp: &[Box<dyn Propagator>],
+        propagators_cp: &KeyedVec<PropagatorId, Box<dyn Propagator>>,
         use_non_generic_conflict_explanation: bool,
         use_non_generic_propagation_explanation: bool,
     ) -> bool {
@@ -152,6 +155,12 @@ impl DebugHelper {
         use_non_generic_conflict_explanation: bool,
         use_non_generic_propagation_explanation: bool,
     ) {
+        let name = propagator.name();
+        if name == "LinearLeq" || name == "Reified(LinearLeq)" {
+            // We do not check the explanations of the linear less than or equal propagator or
+            // reified linear less than or equals for efficiency
+            return;
+        }
         DebugHelper::debug_reported_propagations_reproduce_failure(
             assignments_integer,
             assignments_propositional,
@@ -258,17 +267,18 @@ impl DebugHelper {
     )]
     #[cfg(any(feature = "explanation-checks", test))]
     pub(crate) fn debug_check_propagations(
+        termination: &mut impl TerminationCondition,
         num_trail_entries_before: usize,
         propagator_id: PropagatorId,
         assignments: &AssignmentsInteger,
         assignments_propositional: &AssignmentsPropositional,
         variable_literal_mappings: &VariableLiteralMappings,
         reason_store: &mut ReasonStore,
-        propagators_cp: &[Box<dyn Propagator>],
+        propagators_cp: &KeyedVec<PropagatorId, Box<dyn Propagator>>,
         use_non_generic_conflict_explanation: bool,
         use_non_generic_propagation_explanation: bool,
     ) -> bool {
-        let name = propagators_cp[propagator_id.0 as usize].name();
+        let name = propagators_cp[propagator_id].name();
         if name == "LinearLeq" || name == "Reified(LinearLeq)" {
             // We do not check the explanations of the linear less than or equal propagator or
             // reified linear less than or equals for efficiency
@@ -276,6 +286,9 @@ impl DebugHelper {
         }
         let mut result = true;
         for trail_index in num_trail_entries_before..assignments.num_trail_entries() {
+            if termination.should_stop() {
+                return true;
+            }
             let trail_entry = assignments.get_trail_entry(trail_index);
 
             let reason = reason_store
@@ -302,7 +315,7 @@ impl DebugHelper {
                 assignments,
                 assignments_propositional,
                 variable_literal_mappings,
-                propagators_cp[propagator_id.0 as usize].as_ref(),
+                propagators_cp[propagator_id].as_ref(),
                 propagator_id,
                 use_non_generic_conflict_explanation,
                 use_non_generic_propagation_explanation,

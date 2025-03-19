@@ -109,7 +109,7 @@ where
                 solver.satisfaction_solver.restore_state_at_root(brancher);
                 let _ = solver
                     .satisfaction_solver
-                    .conclude_proof_optimal(objective_bound_predicate);
+                    .conclude_proof_optimal(solver.get_literal(objective_bound_predicate));
                 return OptimisationResult::Optimal(best_solution);
             }
 
@@ -136,7 +136,7 @@ where
                         solver.satisfaction_solver.restore_state_at_root(brancher);
                         let _ = solver
                             .satisfaction_solver
-                            .conclude_proof_optimal(objective_bound_predicate);
+                            .conclude_proof_optimal(solver.get_literal(objective_bound_predicate));
                         return OptimisationResult::Optimal(best_solution);
                     }
                 }

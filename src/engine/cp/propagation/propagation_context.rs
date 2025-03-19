@@ -168,6 +168,11 @@ pub(crate) trait ReadDomains: HasAssignments {
             .is_literal_assigned_true(var)
     }
 
+    fn get_assignment_level_for_literal(&self, literal: Literal) -> usize {
+        self.assignments_propositional()
+            .get_literal_assignment_level(literal)
+    }
+
     /// Returns `true` if the domain of the given variable is singleton.
     fn is_fixed<Var: IntegerVariable>(&self, var: &Var) -> bool {
         self.lower_bound(var) == self.upper_bound(var)

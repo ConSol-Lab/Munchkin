@@ -1,7 +1,10 @@
+use std::num::NonZero;
+
 use clap::Parser;
 use munchkin::branching::branchers::independent_variable_value_brancher::IndependentVariableValueBrancher;
 use munchkin::branching::InDomainMin;
 use munchkin::branching::InputOrder;
+use munchkin::constraints;
 use munchkin::results::ProblemSolution;
 use munchkin::results::SatisfactionResult;
 use munchkin::termination::Indefinite;
@@ -41,16 +44,15 @@ fn main() {
         .map(|(i, var)| var.offset(-(i as i32)))
         .collect::<Vec<_>>();
 
-    // TODO: Post the correct all-different constraints.
-    // let _ = solver
-    //     .add_constraint(...)
-    //     .post();
-    // let _ = solver
-    //     .add_constraint(...)
-    //     .post();
-    // let _ = solver
-    //     .add_constraint(...)
-    //     .post();
+    let _ = solver
+        .add_constraint(constraints::all_different_decomposition(variables.clone()))
+        .post(NonZero::new(1).unwrap());
+    let _ = solver
+        .add_constraint(constraints::all_different_decomposition(diag1))
+        .post(NonZero::new(2).unwrap());
+    let _ = solver
+        .add_constraint(constraints::all_different_decomposition(diag2))
+        .post(NonZero::new(3).unwrap());
 
     let mut brancher =
         IndependentVariableValueBrancher::new(InputOrder::new(variables.clone()), InDomainMin);

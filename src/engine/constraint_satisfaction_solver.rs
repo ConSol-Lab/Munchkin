@@ -5,6 +5,7 @@ use std::cmp::min;
 use std::fmt::Debug;
 use std::fmt::Display;
 use std::fmt::Formatter;
+use std::num::NonZero;
 use std::time::Instant;
 
 use clap::ValueEnum;
@@ -32,6 +33,7 @@ use crate::basic_types::ConflictInfo;
 use crate::basic_types::ConstraintOperationError;
 use crate::basic_types::ConstraintReference;
 use crate::basic_types::Inconsistency;
+use crate::basic_types::KeyedVec;
 use crate::basic_types::PropagationStatusOneStepCP;
 use crate::basic_types::SolutionReference;
 use crate::basic_types::StoredConflictInfo;
@@ -65,6 +67,7 @@ use crate::engine::DebugHelper;
 use crate::munchkin_assert_extreme;
 use crate::munchkin_assert_moderate;
 use crate::munchkin_assert_simple;
+use crate::proof::Proof;
 use crate::termination::Indefinite;
 #[cfg(doc)]
 use crate::Solver;
@@ -112,7 +115,9 @@ pub struct ConstraintSatisfactionSolver {
     clausal_propagator: ClausalPropagator,
     /// The list of propagators. Propagators live here and are queried when events (domain changes)
     /// happen. The list is only traversed during synchronisation for now.
-    cp_propagators: Vec<Box<dyn Propagator>>,
+    pub(crate) cp_propagators: KeyedVec<PropagatorId, Box<dyn Propagator>>,
+    /// Tags for propagators.
+    pub(crate) propagator_tags: KeyedVec<PropagatorId, NonZero<u32>>,
     /// Tracks information about all allocated clauses. All clause allocaton goes exclusively
     /// through the clause allocator. There are two notable exceptions:
     /// - Unit clauses are stored directly on the trail.
@@ -163,7 +168,7 @@ pub struct ConstraintSatisfactionSolver {
     /// Miscellaneous constant parameters used by the solver.
     internal_parameters: SatisfactionSolverOptions,
     /// The names of the variables in the solver.
-    variable_names: VariableNames,
+    pub(crate) variable_names: VariableNames,
 
     semantic_minimiser: SemanticMinimiser,
     recursive_minimiser: RecursiveMinimiser,
@@ -213,6 +218,9 @@ pub struct SatisfactionSolverOptions {
 
     /// Whether to use a non-generic propagation explanation
     pub use_non_generic_propagation_explanation: bool,
+
+    /// The proof log.
+    pub proof: Proof,
 }
 
 /// The strategy used for minimisation
@@ -283,25 +291,12 @@ impl Default for SatisfactionSolverOptions {
             minimisation_strategy: NogoodMinimisationStrategy::default(),
             use_non_generic_conflict_explanation: false,
             use_non_generic_propagation_explanation: false,
+            proof: Proof::default(),
         }
     }
 }
 
 impl ConstraintSatisfactionSolver {
-    /// Conclude the proof with the unsatisfiable claim.
-    ///
-    /// This method will finish the proof. Any new operation will not be logged to the proof.
-    pub fn conclude_proof_unsat(&mut self) -> std::io::Result<()> {
-        Ok(())
-    }
-
-    /// Conclude the proof with the optimality claim.
-    ///
-    /// This method will finish the proof. Any new operation will not be logged to the proof.
-    pub fn conclude_proof_optimal(&mut self, _bound: Predicate) -> std::io::Result<()> {
-        Ok(())
-    }
-
     /// Process the stored domain events. If no events were present, this returns false. Otherwise,
     /// true is returned.
     fn process_domain_events(&mut self) -> bool {
@@ -405,12 +400,13 @@ impl ConstraintSatisfactionSolver {
             false_literal: !dummy_literal,
             conflict_resolver: solver_options.conflict_resolver.make(),
             clausal_propagator: ClausalPropagator::default(),
-            cp_propagators: vec![],
+            cp_propagators: KeyedVec::default(),
             counters: Counters::default(),
             internal_parameters: solver_options,
             variable_names: VariableNames::default(),
             semantic_minimiser: Default::default(),
             recursive_minimiser: Default::default(),
+            propagator_tags: KeyedVec::default(),
         };
 
         // we introduce a dummy variable set to true at the root level
@@ -630,6 +626,22 @@ impl ConstraintSatisfactionSolver {
         }
     }
 
+    /// Conclude the proof with the given bound on the objective variable.
+    pub(crate) fn conclude_proof_optimal(&mut self, bound: Literal) {
+        self.internal_parameters.proof.conclude_proof_optimal(
+            bound,
+            &self.variable_names,
+            &self.variable_literal_mappings,
+        );
+    }
+
+    /// Conclude the proof with the unsat conclusion.
+    pub(crate) fn conclude_proof_unsat(&mut self) {
+        self.internal_parameters
+            .proof
+            .conclude_proof_unsat(&self.variable_names, &self.variable_literal_mappings);
+    }
+
     fn synchronise_propositional_trail_based_on_integer_trail(&mut self) -> Option<ConflictInfo> {
         // for each entry on the integer trail, we now add the equivalent propositional
         // representation on the propositional trail  note that only one literal per
@@ -789,6 +801,7 @@ impl ConstraintSatisfactionSolver {
                 if self.assignments_propositional.is_at_the_root_level() {
                     // If it is at the root level then the problem is infeasible
                     self.state.declare_infeasible();
+                    let _ = self.internal_parameters.proof.log_nogood([], []);
                     return CSPSolverExecutionFlag::Infeasible;
                 }
 
@@ -970,7 +983,7 @@ impl ConstraintSatisfactionSolver {
             NogoodMinimisationStrategy::NoMinimisation,
         ) {
             recompute_invariants(
-                PropagationContext::new(
+                &PropagationContext::new(
                     &self.assignments_integer,
                     &self.assignments_propositional,
                     self.internal_parameters
@@ -1000,7 +1013,7 @@ impl ConstraintSatisfactionSolver {
             variable_literal_mappings: &self.variable_literal_mappings,
             assignments_integer: &mut self.assignments_integer,
             assignments_propositional: &mut self.assignments_propositional,
-            internal_parameters: &self.internal_parameters,
+            internal_parameters: &mut self.internal_parameters,
             solver_state: &mut self.state,
             brancher,
             clause_allocator: &mut self.clause_allocator,
@@ -1086,7 +1099,7 @@ impl ConstraintSatisfactionSolver {
             variable_literal_mappings: &self.variable_literal_mappings,
             assignments_integer: &mut self.assignments_integer,
             assignments_propositional: &mut self.assignments_propositional,
-            internal_parameters: &self.internal_parameters,
+            internal_parameters: &mut self.internal_parameters,
             solver_state: &mut self.state,
             brancher,
             clause_allocator: &mut self.clause_allocator,
@@ -1114,7 +1127,7 @@ impl ConstraintSatisfactionSolver {
             variable_literal_mappings: &self.variable_literal_mappings,
             assignments_integer: &mut self.assignments_integer,
             assignments_propositional: &mut self.assignments_propositional,
-            internal_parameters: &self.internal_parameters,
+            internal_parameters: &mut self.internal_parameters,
             solver_state: &mut self.state,
             brancher,
             clause_allocator: &mut self.clause_allocator,
@@ -1209,7 +1222,7 @@ impl ConstraintSatisfactionSolver {
                 .expect("should not be an error");
 
             // ask propagators to propagate
-            let propagation_status_one_step_cp = self.propagate_cp_one_step();
+            let propagation_status_one_step_cp = self.propagate_cp_one_step(termination);
 
             match propagation_status_one_step_cp {
                 PropagationStatusOneStepCP::PropagationHappened(reported_empty_domain) => {
@@ -1269,7 +1282,10 @@ impl ConstraintSatisfactionSolver {
     /// domain change. The idea is to go to the clausal propagator first before proceeding with
     /// other propagators, in line with the idea of propagating simpler propagators before more
     /// complex ones.
-    fn propagate_cp_one_step(&mut self) -> PropagationStatusOneStepCP {
+    fn propagate_cp_one_step(
+        &mut self,
+        _termination: &mut impl TerminationCondition,
+    ) -> PropagationStatusOneStepCP {
         if self.propagator_queue.is_empty() {
             return PropagationStatusOneStepCP::FixedPoint;
         }
@@ -1278,7 +1294,7 @@ impl ConstraintSatisfactionSolver {
         let num_trail_entries_before = self.assignments_integer.num_trail_entries();
 
         let propagator_id = self.propagator_queue.pop();
-        let propagator = &mut self.cp_propagators[propagator_id.0 as usize];
+        let propagator = &mut self.cp_propagators[propagator_id];
         let context = PropagationContextMut::new(
             &mut self.assignments_integer,
             &mut self.reason_store,
@@ -1324,6 +1340,7 @@ impl ConstraintSatisfactionSolver {
                 #[cfg(feature = "explanation-checks")]
                 assert!(
                     DebugHelper::debug_check_propagations(
+                        _termination,
                         num_trail_entries_before,
                         propagator_id,
                         &self.assignments_integer,
@@ -1405,11 +1422,13 @@ impl ConstraintSatisfactionSolver {
     pub fn add_propagator(
         &mut self,
         propagator_to_add: impl Propagator + 'static,
+        tag: NonZero<u32>,
     ) -> Result<(), ConstraintOperationError> {
         if self.state.is_inconsistent() {
             return Err(ConstraintOperationError::InfeasiblePropagator);
         }
 
+        self.propagator_tags.push(tag);
         let new_propagator_id = PropagatorId(self.cp_propagators.len() as u32);
 
         self.cp_propagators.push(Box::new(propagator_to_add));

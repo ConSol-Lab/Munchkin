@@ -1,9 +1,12 @@
 #![allow(unused, reason = "this file is a skeleton for the assignment")]
 
 use crate::basic_types::PropagationStatusCP;
+use crate::conjunction;
+use crate::engine::cp::domain_events::DomainEvents;
 use crate::engine::cp::propagation::PropagationContextMut;
 use crate::engine::cp::propagation::Propagator;
 use crate::engine::cp::propagation::PropagatorInitialisationContext;
+use crate::engine::cp::propagation::ReadDomains;
 use crate::predicates::PropositionalConjunction;
 use crate::variables::IntegerVariable;
 
@@ -22,13 +25,13 @@ impl<Var: IntegerVariable + 'static> Propagator for AllDifferentPropagator<Var> 
         "AllDifferent"
     }
 
-    fn propagate(&self, _context: PropagationContextMut) -> PropagationStatusCP {
+    fn propagate(&self, mut context: PropagationContextMut) -> PropagationStatusCP {
         todo!()
     }
 
     fn initialise_at_root(
         &mut self,
-        _context: &mut PropagatorInitialisationContext,
+        context: &mut PropagatorInitialisationContext,
     ) -> Result<(), PropositionalConjunction> {
         todo!()
     }

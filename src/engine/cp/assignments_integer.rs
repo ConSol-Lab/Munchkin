@@ -28,7 +28,8 @@ pub struct AssignmentsInteger {
     backtrack_events: EventSink,
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, thiserror::Error)]
+#[error("domain became empty")]
 pub struct EmptyDomain;
 
 impl AssignmentsInteger {

@@ -1,3 +1,5 @@
+use std::num::NonZero;
+
 use super::Constraint;
 use crate::constraints;
 use crate::predicate;
@@ -43,7 +45,7 @@ struct DecomposedCircuit {
 }
 
 impl Constraint for DecomposedCircuit {
-    fn post(self, solver: &mut Solver) -> Result<(), ConstraintOperationError> {
+    fn post(self, solver: &mut Solver, tag: NonZero<u32>) -> Result<(), ConstraintOperationError> {
         let DecomposedCircuit {
             successors,
             sub_circuit_elimination,
@@ -57,29 +59,36 @@ impl Constraint for DecomposedCircuit {
                 &successors,
                 use_all_different_decomposition,
                 use_element_decomposition,
+                tag,
             )?,
-            SubCircuitElimination::ForwardChecking => {
-                solver.add_propagator(ForwardCheckingCircuitPropagator::new(successors.clone()))?
-            }
+            SubCircuitElimination::ForwardChecking => solver.add_propagator(
+                ForwardCheckingCircuitPropagator::new(successors.clone()),
+                tag,
+            )?,
             SubCircuitElimination::Dfs => {
-                solver.add_propagator(DfsCircuitPropagator::new(successors.clone()))?
+                solver.add_propagator(DfsCircuitPropagator::new(successors.clone()), tag)?
             }
         }
 
         if use_all_different_decomposition {
             solver
                 .add_constraint(constraints::all_different_decomposition(successors.clone()))
-                .post()?;
+                .post(tag)?;
         } else {
             solver
                 .add_constraint(constraints::all_different(successors.clone()))
-                .post()?;
+                .post(tag)?;
         }
 
         Ok(())
     }
 
-    fn implied_by(self, _: &mut Solver, _: Literal) -> Result<(), ConstraintOperationError> {
+    fn implied_by(
+        self,
+        _: &mut Solver,
+        _: Literal,
+        _: NonZero<u32>,
+    ) -> Result<(), ConstraintOperationError> {
         todo!("implement half reification of decomposed circuit")
     }
 }
@@ -89,6 +98,7 @@ fn post_sub_circuit_elimination_decomposition(
     successors: &[AffineView<DomainId>],
     use_all_different_decomposition: bool,
     use_element_decomposition: bool,
+    tag: NonZero<u32>,
 ) -> Result<(), ConstraintOperationError> {
     let min = successors
         .iter()
@@ -122,7 +132,7 @@ fn post_sub_circuit_elimination_decomposition(
                     order.clone(),
                     succ_order.into(),
                 ))
-                .post()?;
+                .post(tag)?;
         } else {
             solver
                 .add_constraint(constraints::element(
@@ -130,30 +140,30 @@ fn post_sub_circuit_elimination_decomposition(
                     order.clone(),
                     succ_order,
                 ))
-                .post()?;
+                .post(tag)?;
         }
 
         let order_i_eq_max = solver.get_literal(predicate![order[i] == max]);
 
         solver
             .add_constraint(constraints::equals([succ_order], 1))
-            .implied_by(order_i_eq_max)?;
+            .implied_by(order_i_eq_max, tag)?;
         solver
             .add_constraint(constraints::equals(
                 [succ_order.into(), order[i].clone().scaled(-1)],
                 1,
             ))
-            .implied_by(!order_i_eq_max)?;
+            .implied_by(!order_i_eq_max, tag)?;
     }
 
     if use_all_different_decomposition {
         solver
             .add_constraint(constraints::all_different_decomposition(order.clone()))
-            .post()?;
+            .post(tag)?;
     } else {
         solver
             .add_constraint(constraints::all_different(order.clone()))
-            .post()?;
+            .post(tag)?;
     }
 
     for (idx, var) in successors.iter().enumerate() {
@@ -161,7 +171,7 @@ fn post_sub_circuit_elimination_decomposition(
 
         solver
             .add_constraint(constraints::not_equals([var.clone()], idx + 1))
-            .post()?;
+            .post(tag)?;
     }
 
     Ok(())

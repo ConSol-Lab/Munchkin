@@ -1,3 +1,5 @@
+use std::num::NonZero;
+
 use super::Constraint;
 use crate::constraints;
 use crate::predicate;
@@ -39,7 +41,7 @@ where
     Index: IntegerVariable,
     ArrayVar: IntegerVariable + 'static,
 {
-    fn post(self, solver: &mut Solver) -> Result<(), ConstraintOperationError> {
+    fn post(self, solver: &mut Solver, tag: NonZero<u32>) -> Result<(), ConstraintOperationError> {
         // Index is 1-indexed, but the implementation is 0-indexed.
         let index = self.index.offset(-1);
 
@@ -51,13 +53,18 @@ where
                     array_element.clone(),
                     self.rhs.clone(),
                 ))
-                .implied_by(idx_eq_i)?;
+                .implied_by(idx_eq_i, tag)?;
         }
 
         Ok(())
     }
 
-    fn implied_by(self, _: &mut Solver, _: Literal) -> Result<(), ConstraintOperationError> {
+    fn implied_by(
+        self,
+        _: &mut Solver,
+        _: Literal,
+        _: NonZero<u32>,
+    ) -> Result<(), ConstraintOperationError> {
         todo!("half-reification of element encoding")
     }
 }

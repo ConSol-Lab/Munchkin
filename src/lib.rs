@@ -287,6 +287,7 @@ use crate::results::unsatisfiable::UnsatisfiableUnderAssumptions;
 pub(crate) mod asserts;
 pub(crate) mod basic_types;
 pub(crate) mod engine;
+pub(crate) mod proof;
 pub(crate) mod propagators;
 #[cfg(doc)]
 use crate::branching::Brancher;
@@ -295,6 +296,7 @@ use crate::termination::TerminationCondition;
 
 pub mod branching;
 pub mod constraints;
+pub mod encodings;
 pub mod model;
 pub mod optimisation;
 pub mod runner;

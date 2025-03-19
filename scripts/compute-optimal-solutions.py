@@ -24,7 +24,7 @@ def compute_optimal_values(args: Args):
     for instance in instances.glob("*.dzn"):
         print(f"Computing {instance.stem}")
         result = run(
-            ["minizinc", "--output-objective", "--solver", "cp-sat", "-f", model_path, instance], 
+            ["minizinc", "--output-objective", "--output-mode", "dzn", "--solver", "cp-sat", "-f", model_path, instance], 
             capture_output=True, 
             text=True
         )
@@ -61,7 +61,7 @@ def compute_optimal_values(args: Args):
 if __name__ == "__main__":
     arg_parser = ArgumentParser()
 
-    arg_parser.add_argument("model", choices=MODELS, help="The model to get the optimal values for.")
+    arg_parser.add_argument("model", choices=MINIZINC_MODELS.keys(), help="The model to get the optimal values for.")
 
     args = arg_parser.parse_args()
 

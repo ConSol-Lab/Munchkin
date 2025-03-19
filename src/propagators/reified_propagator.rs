@@ -141,7 +141,7 @@ mod tests {
         let _ = solver
             .new_propagator(ReifiedPropagator::new(
                 GenericPropagator::new(
-                    move |_: PropagationContextMut| Err(t1.clone().into()),
+                    move |_: PropagationContextMut| Err((t1.clone()).into()),
                     move |_: PropagationContext| Some(t2.clone()),
                     |_: &mut PropagatorInitialisationContext| Ok(()),
                 ),
@@ -201,7 +201,7 @@ mod tests {
         let inconsistency = solver
             .new_propagator(ReifiedPropagator::new(
                 GenericPropagator::new(
-                    move |_: PropagationContextMut| Err(conjunction!([var >= 1]).into()),
+                    move |_: PropagationContextMut| Err((conjunction!([var >= 1])).into()),
                     |_: PropagationContext| None,
                     |_: &mut PropagatorInitialisationContext| Ok(()),
                 ),

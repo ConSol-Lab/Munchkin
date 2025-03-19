@@ -51,10 +51,26 @@ impl<Key: StorageKey, Value> KeyedVec<Key, Value> {
     pub(crate) fn iter(&self) -> impl Iterator<Item = &'_ Value> {
         self.elements.iter()
     }
+
+    pub(crate) fn into_entries(self) -> impl Iterator<Item = (Key, Value)> {
+        self.elements
+            .into_iter()
+            .enumerate()
+            .map(|(idx, value)| (Key::create_from_index(idx), value))
+    }
 }
 
 #[allow(unused, reason = "-")]
 impl<Key: StorageKey, Value: Clone> KeyedVec<Key, Value> {
+
+    /// Insert a specific key-value pair. If an item already exists with the given key, it is
+    /// overwritten.
+    pub(crate) fn insert_with_default(&mut self, key: Key, mut value: Value, default_value: Value) {
+        self.accomodate(key.clone(), default_value);
+
+        std::mem::swap(&mut value, &mut self.elements[key.index()]);
+    }
+
     pub(crate) fn resize(&mut self, new_len: usize, value: Value) {
         self.elements.resize(new_len, value)
     }
@@ -102,7 +118,7 @@ impl StorageKey for usize {
     }
 }
 /// A simple trait which requires that the structures implementing this trait can generate an index.
-pub(crate) trait StorageKey {
+pub(crate) trait StorageKey: Clone {
     fn index(&self) -> usize;
     #[allow(unused, reason = "-")]
     fn create_from_index(index: usize) -> Self;

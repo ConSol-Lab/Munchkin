@@ -13,6 +13,7 @@ To specify a global, the `--global` flag can be used. This flag can be provided 
 ```
 $ cargo run --example tsp -- data/tsp/TSP_N5_0.dzn solve --global dfs-circuit --global all-different 10
 ```
+For the linear constraint, the solver can also be instructed to use an encoding. Supply the `--linear-encoding` flag to specify which encoding to use.
 
 ## Provided Scripts
 We have provided scripts to help with the evaluation of your implementation. These can be found in the `scripts` directory.

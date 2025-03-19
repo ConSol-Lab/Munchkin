@@ -20,6 +20,8 @@ STATISTICS = [
     "numberOfLearnedUnitNogoods",
     "averageLearnedNogoodLength",
     "averageLearnedNogoodLbd",
+    "nogoodsAfterTrimming",
+    "numberOfInferences",
 ];
 
 
@@ -44,6 +46,21 @@ def run(args: Args):
         for run in context.runs.iterdir():
             run_data = parse_run(run)
             writer.writerow([run_data.get(stat, "-") for stat in STATISTICS])
+
+
+def parse_stats_from_str(log: str) -> dict[str, int]:
+    stats = {}
+
+    for line in log.splitlines():
+        if not line.startswith("%% "):
+            continue
+
+        line = line.removeprefix("%% ").strip()
+
+        stat_name, value = line.split('=')
+        stats[stat_name] = int(value)
+
+    return stats
 
 
 def parse_run(run: Path):
@@ -78,19 +95,33 @@ def parse_run(run: Path):
     else:
         result = splits[1].strip()
 
-    stats = {
+    # If proof logging was done, process those results as well.
+    process_log_path = run / "process.log"
+    if process_log_path.is_file():
+        with process_log_path.open('r') as f:
+            process_log = f.read()
+
+        process_stats = parse_stats_from_str(process_log)
+    else:
+        process_stats = {}
+
+    # If proof checking was done, indicate the status.
+    checking_status_file = run / "checking_status"
+    if checking_status_file.is_file():
+        with checking_status_file.open('r') as f:
+            checking_status = int(f.read())
+
+        checking_stats = {"proof_checking": "SUCCESS" if checking_status == 0 else "FAILED"}
+    else:
+        checking_stats = {}
+
+    stats: dict[str, str | int] = {
         "instance": run.stem,
-        "status": "OPTIMAL" if optimal else "SATISFIABLE" if has_solution else "UNSATISFIABLE" if is_unsatisfiable else "UNKNOWN"
+        "status": "OPTIMAL" if optimal else "SATISFIABLE" if has_solution else "UNSATISFIABLE" if is_unsatisfiable else "UNKNOWN",
+        **parse_stats_from_str(result),
+        **process_stats,
+        **checking_stats,
     }
-
-    for line in result.splitlines():
-        if not line.startswith("%% "):
-            continue
-
-        line = line.removeprefix("%% ").strip()
-
-        stat_name, value = line.split('=')
-        stats[stat_name] = int(value)
 
     return stats
 

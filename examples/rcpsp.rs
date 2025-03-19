@@ -139,6 +139,10 @@ impl Problem<SearchStrategies> for Rcpsp {
         solver_variables: &VariableMap,
     ) -> impl Brancher + 'static {
         match strategy {
+            #[allow(
+                trivial_casts,
+                reason = "without it, the type-checker cannot infer that `dyn Brancher` impls `Brancher`"
+            )]
             SearchStrategies::Default => Box::new(IndependentVariableValueBrancher::new(
                 InputOrder::new(
                     solver_variables

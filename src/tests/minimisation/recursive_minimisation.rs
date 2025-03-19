@@ -4,9 +4,11 @@ use crate::engine::conflict_analysis::LearnedNogood;
 use crate::engine::minimisation::MinimisationContext;
 use crate::engine::minimisation::Minimiser;
 use crate::engine::minimisation::RecursiveMinimiser;
+use crate::engine::sat::AssignmentsPropositional;
 use crate::engine::sat::ExplanationClauseManager;
 use crate::engine::test_helper::TestSolver;
 use crate::tests::minimisation::semantic_minimisation::assert_elements_equal;
+use crate::variables::Literal;
 
 #[test]
 /// Based on Figure 1 from https://link.springer.com/chapter/10.1007/978-3-642-02777-2_15
@@ -43,6 +45,11 @@ fn test_recursive_minimisation() {
     let v = solver.new_literal();
     let n = solver.new_literal();
     let i = solver.new_literal();
+
+    let all_literals = [
+        a, b, c, d, z, y, x, w, r, q, p, delta, s, m, h, gamma, t, l, g, beta, u, k, f, alpha, j,
+        e, v, n, i,
+    ];
 
     let _ = solver.add_clause(vec![!e, !j, !f]);
 
@@ -99,6 +106,8 @@ fn test_recursive_minimisation() {
     let result = solver.propagate_clausal_propagator();
     assert!(result.is_err());
 
+    assert_all_fixed(&all_literals, &solver.assignments_propositional);
+
     let mut learned_nogood = LearnedNogood::new(vec![p, j, k, i, m, r, l, q], 2);
 
     let mut explanation_clause_manager = ExplanationClauseManager::default();
@@ -116,4 +125,13 @@ fn test_recursive_minimisation() {
     minimiser.minimise(context, &mut learned_nogood);
 
     assert_elements_equal(learned_nogood.literals, vec![p, j, k, i, r, q])
+}
+
+fn assert_all_fixed(
+    all_literals: &[Literal],
+    assignments_propositional: &AssignmentsPropositional,
+) {
+    assert!(all_literals
+        .iter()
+        .all(|literal| assignments_propositional.is_literal_assigned(*literal)))
 }

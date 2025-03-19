@@ -17,6 +17,7 @@ use crate::engine::sat::ExplanationClauseManager;
 use crate::engine::test_helper::TestSolver;
 use crate::options::SolverOptions;
 use crate::predicates::Predicate;
+use crate::proof::Proof;
 
 struct DummyBrancher;
 impl Brancher for DummyBrancher {
@@ -70,12 +71,13 @@ fn test_all_decision() {
             variable_literal_mappings: &solver.variable_literal_mappings,
             assignments_integer: &mut solver.assignments_integer,
             assignments_propositional: &mut solver.assignments_propositional,
-            internal_parameters: &SolverOptions {
+            internal_parameters: &mut SolverOptions {
                 random_generator: SmallRng::seed_from_u64(42),
                 conflict_resolver: ConflictResolutionStrategy::AllDecision,
                 minimisation_strategy: NogoodMinimisationStrategy::default(),
                 use_non_generic_conflict_explanation: true,
                 use_non_generic_propagation_explanation: true,
+                proof: Proof::default(),
             },
             assumptions: &vec![],
             solver_state: &mut state,

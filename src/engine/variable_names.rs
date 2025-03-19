@@ -6,9 +6,15 @@ use crate::engine::variables::PropositionalVariable;
 pub(crate) struct VariableNames {
     propositionals: HashMap<PropositionalVariable, String>,
     integers: HashMap<DomainId, String>,
+    integers_by_name: HashMap<String, DomainId>,
 }
 
 impl VariableNames {
+    /// Get a domain by its name.
+    pub(crate) fn get_domain_by_name(&self, name: &str) -> Option<DomainId> {
+        self.integers_by_name.get(name).copied()
+    }
+
     /// Get the name associated with a propositional variable.
     #[allow(unused, reason = "can be used in assignment")]
     pub(crate) fn get_propositional_name(
@@ -33,6 +39,7 @@ impl VariableNames {
     /// Add a name to the integer variable. This will override existing the name if it
     /// exists.
     pub(crate) fn add_integer(&mut self, integer: DomainId, name: String) {
-        let _ = self.integers.insert(integer, name);
+        let _ = self.integers.insert(integer, name.clone());
+        let _ = self.integers_by_name.insert(name, integer);
     }
 }

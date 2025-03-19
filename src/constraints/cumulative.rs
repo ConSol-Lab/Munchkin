@@ -1,4 +1,5 @@
 use std::fmt::Debug;
+use std::num::NonZero;
 
 use super::Constraint;
 use crate::constraints;
@@ -44,7 +45,7 @@ struct CumulativeConstraint<Var> {
 }
 
 impl<Var: IntegerVariable + 'static> Constraint for CumulativeConstraint<Var> {
-    fn post(self, solver: &mut Solver) -> Result<(), ConstraintOperationError> {
+    fn post(self, solver: &mut Solver, tag: NonZero<u32>) -> Result<(), ConstraintOperationError> {
         let CumulativeConstraint {
             impl_strategy,
             start_times,
@@ -54,31 +55,41 @@ impl<Var: IntegerVariable + 'static> Constraint for CumulativeConstraint<Var> {
         } = self;
 
         match impl_strategy {
-            CumulativeImpl::TimeTable => solver.add_propagator(TimeTablePropagator::new(
-                start_times,
-                durations,
-                resource_requirements,
-                resource_capacity,
-            )),
-            CumulativeImpl::EnergeticReasoning => {
-                solver.add_propagator(EnergeticReasoningPropagator::new(
+            CumulativeImpl::TimeTable => solver.add_propagator(
+                TimeTablePropagator::new(
                     start_times,
                     durations,
                     resource_requirements,
                     resource_capacity,
-                ))
-            }
+                ),
+                tag,
+            ),
+            CumulativeImpl::EnergeticReasoning => solver.add_propagator(
+                EnergeticReasoningPropagator::new(
+                    start_times,
+                    durations,
+                    resource_requirements,
+                    resource_capacity,
+                ),
+                tag,
+            ),
             CumulativeImpl::Decomposition => post_cumulative_decomposition(
                 solver,
                 &start_times,
                 &durations,
                 &resource_requirements,
                 resource_capacity,
+                tag,
             ),
         }
     }
 
-    fn implied_by(self, _: &mut Solver, _: Literal) -> Result<(), ConstraintOperationError> {
+    fn implied_by(
+        self,
+        _: &mut Solver,
+        _: Literal,
+        _: NonZero<u32>,
+    ) -> Result<(), ConstraintOperationError> {
         todo!("implement cumulative decomposition with half-reification")
     }
 }
@@ -89,6 +100,7 @@ fn post_cumulative_decomposition<Var: IntegerVariable + 'static>(
     durations: &[u32],
     resource_requirements: &[u32],
     resource_capacity: u32,
+    tag: NonZero<u32>,
 ) -> Result<(), ConstraintOperationError> {
     let horizon: u32 = durations.iter().sum();
 
@@ -109,7 +121,7 @@ fn post_cumulative_decomposition<Var: IntegerVariable + 'static>(
             // will be 0.
             solver
                 .add_constraint(constraints::equals([usage_of_task_at_current_timepoint], 0))
-                .reify(!is_active_at_timepoint)?;
+                .reify(!is_active_at_timepoint, tag)?;
 
             let duration = durations[task];
 
@@ -124,7 +136,7 @@ fn post_cumulative_decomposition<Var: IntegerVariable + 'static>(
                         [start_times[task].clone()],
                         (timepoint - duration) as i32,
                     ))
-                    .reify(literal)?;
+                    .reify(literal, tag)?;
 
                 literal
             };
@@ -142,7 +154,7 @@ fn post_cumulative_decomposition<Var: IntegerVariable + 'static>(
                         [start_times[task].scaled(-1)],
                         -(timepoint as i32) - 1,
                     ))
-                    .reify(literal)?;
+                    .reify(literal, tag)?;
 
                 literal
             };
@@ -150,7 +162,7 @@ fn post_cumulative_decomposition<Var: IntegerVariable + 'static>(
             // !is_active_at_timepoint <-> (ends_before \/ starts_after)
             solver
                 .add_constraint(constraints::clause([ends_before, starts_after]))
-                .reify(!is_active_at_timepoint)?;
+                .reify(!is_active_at_timepoint, tag)?;
 
             usages.push(usage_of_task_at_current_timepoint);
         }
@@ -160,7 +172,7 @@ fn post_cumulative_decomposition<Var: IntegerVariable + 'static>(
                 usages,
                 resource_capacity as i32,
             ))
-            .post()?;
+            .post(tag)?;
     }
 
     Ok(())

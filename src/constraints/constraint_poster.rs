@@ -1,3 +1,5 @@
+use std::num::NonZero;
+
 use log::warn;
 
 use super::Constraint;
@@ -28,8 +30,8 @@ impl<ConstraintImpl: Constraint> ConstraintPoster<'_, ConstraintImpl> {
     ///
     /// This method returns a [`ConstraintOperationError`] if the addition of the [`Constraint`] led
     /// to a root-level conflict.
-    pub fn post(mut self) -> Result<(), ConstraintOperationError> {
-        self.constraint.take().unwrap().post(self.solver)
+    pub fn post(mut self, tag: NonZero<u32>) -> Result<(), ConstraintOperationError> {
+        self.constraint.take().unwrap().post(self.solver, tag)
     }
 
     /// Add the half-reified version of the [`Constraint`] to the [`Solver`]; i.e. post the
@@ -40,11 +42,12 @@ impl<ConstraintImpl: Constraint> ConstraintPoster<'_, ConstraintImpl> {
     pub fn implied_by(
         mut self,
         reification_literal: Literal,
+        tag: NonZero<u32>,
     ) -> Result<(), ConstraintOperationError> {
         self.constraint
             .take()
             .unwrap()
-            .implied_by(self.solver, reification_literal)
+            .implied_by(self.solver, reification_literal, tag)
     }
 }
 
@@ -54,11 +57,15 @@ impl<ConstraintImpl: NegatableConstraint> ConstraintPoster<'_, ConstraintImpl> {
     ///
     /// This method returns a [`ConstraintOperationError`] if the addition of the [`Constraint`] led
     /// to a root-level conflict.
-    pub fn reify(mut self, reification_literal: Literal) -> Result<(), ConstraintOperationError> {
+    pub fn reify(
+        mut self,
+        reification_literal: Literal,
+        tag: NonZero<u32>,
+    ) -> Result<(), ConstraintOperationError> {
         self.constraint
             .take()
             .unwrap()
-            .reify(self.solver, reification_literal)
+            .reify(self.solver, reification_literal, tag)
     }
 }
 

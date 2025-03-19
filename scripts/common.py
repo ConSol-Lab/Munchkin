@@ -64,6 +64,9 @@ class Context:
 
     flags: List[str]
     """Flags provided to the model for every run. These typically set options in the solver."""
+
+    with_proofs: bool
+    """If true, enables scaffold logging."""
     
 
     def to_dict(self) -> dict:
@@ -78,6 +81,7 @@ class Context:
             "has_dirty_files": self.has_dirty_files,
             "executable": str(self.executable),
             "flags": self.flags,
+            "with_proofs": self.with_proofs,
         }
 
 
@@ -94,6 +98,7 @@ class Context:
             has_dirty_files=bool(dictionary["has_dirty_files"]),
             executable=Path(dictionary["executable"]),
             flags=dictionary["flags"],
+            with_proofs=dictionary.get("with_proofs", False),
         )
 
 
@@ -280,6 +285,9 @@ class Args:
     flags: List[str]
     """Additional flags provided to the solver."""
 
+    with_proofs: bool
+    """If true, scaffolds will be logged."""
+
     allow_dirty: bool
     """If true, allows uncommitted git changes."""
 
@@ -400,6 +408,7 @@ def initialise(args: Args) -> Context | None:
         executable=executable,
         flags=args.flags,
         has_dirty_files=git_status.has_dirty_files,
+        with_proofs=args.with_proofs,
     )
 
     with (directory / "manifest.json").open('w') as context_file:
@@ -424,10 +433,12 @@ def run_instance(instance: Path, context: Context):
     log_file_path = instance_directory / "output.log"
     err_file_path = instance_directory / "output.err"
 
+    proof_args = ["-P", instance_directory / "scaffold.drcp"] if context.with_proofs else []
+
     with log_file_path.open('w') as log_file:
         with err_file_path.open('w') as err_file:
             run(
-                [context.executable, instance, "solve", *context.flags, str(context.timeout)],
+                [context.executable, instance, "solve", *proof_args, *context.flags, str(context.timeout)],
                 stdout=log_file,
                 stderr=err_file,
             ) 

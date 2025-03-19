@@ -1,6 +1,8 @@
 mod equality;
 mod inequality;
 
+use std::num::NonZero;
+
 pub use equality::*;
 pub use inequality::*;
 
@@ -44,17 +46,22 @@ impl<Var> Constraint for MaximumDecomposition<Var>
 where
     Var: IntegerVariable + 'static,
 {
-    fn post(self, solver: &mut Solver) -> Result<(), ConstraintOperationError> {
+    fn post(self, solver: &mut Solver, tag: NonZero<u32>) -> Result<(), ConstraintOperationError> {
         for element in self.array {
             solver
                 .add_constraint(binary_less_than_or_equals(element, self.rhs.clone()))
-                .post()?;
+                .post(tag)?;
         }
 
         Ok(())
     }
 
-    fn implied_by(self, _: &mut Solver, _: Literal) -> Result<(), ConstraintOperationError> {
+    fn implied_by(
+        self,
+        _: &mut Solver,
+        _: Literal,
+        _: NonZero<u32>,
+    ) -> Result<(), ConstraintOperationError> {
         todo!("implement half-reification for maximum decomposition")
     }
 }

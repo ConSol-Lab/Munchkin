@@ -132,7 +132,6 @@ impl MinimisationContext<'_> {
     /// kept, so asking about the reason for a root propagation will cause a panic.
     ///
     /// *Note* - The `0th` [`Literal`] in the clause represents the literal that was propagated.
-    #[allow(unused, reason = "will be used in an assignment")]
     pub(crate) fn get_propagation_clause_reference(
         &mut self,
         propagated_literal: Literal,
