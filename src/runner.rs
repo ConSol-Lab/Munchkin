@@ -121,6 +121,11 @@ pub trait Problem<SearchStrategies>: Sized {
     /// The objective variable.
     fn objective(&self) -> IntVariable;
 
+    /// Returns the linear objective function (or simply the objective variable if it is non-linear)
+    fn objective_function(&self) -> Vec<IntVariable> {
+        vec![self.objective()]
+    }
+
     fn get_search(
         &self,
         strategy: SearchStrategies,
@@ -265,15 +270,18 @@ pub fn solve<SearchStrategies>(
             &mut time_budget,
             LinearUnsatSat::new(Minimise, objective_variable.clone(), solution_callback),
         ),
-        OptimisationStrategy::CoreGuided => solver.optimise(
-            &mut brancher,
-            &mut time_budget,
-            CoreGuidedSearch::new(
-                Minimise,
-                vec![objective_variable.clone()],
-                solution_callback,
-            ),
-        ),
+        OptimisationStrategy::CoreGuided => {
+            let objective_function = instance
+                .objective_function()
+                .into_iter()
+                .map(|var| solver_variables.to_solver_variable(var))
+                .collect::<Vec<_>>();
+            solver.optimise(
+                &mut brancher,
+                &mut time_budget,
+                CoreGuidedSearch::new(Minimise, objective_function, solution_callback),
+            )
+        }
         OptimisationStrategy::LBBD => todo!(),
     };
 
@@ -352,7 +360,7 @@ fn print_output(output: &Output, solver_variables: &VariableMap, solution: &Solu
                         print!(", ");
                     }
                 }
-                println!("");
+                println!();
             }
             println!("|];");
         }

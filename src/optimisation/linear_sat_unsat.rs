@@ -67,7 +67,7 @@ where
             CSPSolverExecutionFlag::Infeasible => {
                 // Reset the state whenever we return a result
                 solver.satisfaction_solver.restore_state_at_root(brancher);
-                let _ = solver.satisfaction_solver.conclude_proof_unsat();
+                solver.satisfaction_solver.conclude_proof_unsat();
                 return OptimisationResult::Unsatisfiable;
             }
             CSPSolverExecutionFlag::Timeout => {
@@ -107,7 +107,7 @@ where
             {
                 // Reset the state whenever we return a result
                 solver.satisfaction_solver.restore_state_at_root(brancher);
-                let _ = solver
+                solver
                     .satisfaction_solver
                     .conclude_proof_optimal(solver.get_literal(objective_bound_predicate));
                 return OptimisationResult::Optimal(best_solution);
@@ -134,7 +134,7 @@ where
                     {
                         // Reset the state whenever we return a result
                         solver.satisfaction_solver.restore_state_at_root(brancher);
-                        let _ = solver
+                        solver
                             .satisfaction_solver
                             .conclude_proof_optimal(solver.get_literal(objective_bound_predicate));
                         return OptimisationResult::Optimal(best_solution);

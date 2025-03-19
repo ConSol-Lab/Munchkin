@@ -136,4 +136,8 @@ impl Problem<SearchStrategies> for ClusterEditing {
         ]
         .into_iter()
     }
+
+    fn objective_function(&self) -> Vec<IntVariable> {
+        self.objective_elements.clone()
+    }
 }
