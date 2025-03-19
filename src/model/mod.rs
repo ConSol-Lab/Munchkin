@@ -20,6 +20,9 @@ pub struct Model {
     variables: Vec<(String, i32, i32)>,
     /// Arrays of variables.
     arrays: Vec<(String, Range<usize>)>,
+    /// Two dimensional arrays of variables - Stores the range of the variables and the number of
+    /// columns
+    two_dimensional_arrays: Vec<(String, (Range<usize>, usize))>,
     /// The constraints in the model.
     constraints: Vec<Constraint>,
 }
@@ -66,6 +69,29 @@ impl Model {
         IntVariableArray(id)
     }
 
+    pub fn new_interval_variable_matrix(
+        &mut self,
+        name: impl Display,
+        lower_bound: i32,
+        upper_bound: i32,
+        num_rows: usize,
+        num_columns: usize,
+    ) -> TwoDimensionalIntVariableArray {
+        let id = self.two_dimensional_arrays.len();
+        let len = num_rows * num_columns;
+
+        let start = self.variables.len();
+        (0..len).for_each(|i| {
+            let _ = self.new_interval_variable(format!("{name}[{i}]"), lower_bound, upper_bound);
+        });
+
+        let end = self.variables.len();
+        self.two_dimensional_arrays
+            .push((name.to_string(), (start..end, num_columns)));
+
+        TwoDimensionalIntVariableArray(id)
+    }
+
     /// Add a constraint to the model.
     ///
     /// It is important to only use constraints with variables created on the same instance of
@@ -101,6 +127,7 @@ impl Model {
             variables,
             names,
             arrays: self.arrays,
+            two_dimensional_arrays: self.two_dimensional_arrays,
         };
 
         let _ = add_constraints(
@@ -290,6 +317,25 @@ impl IntVariable {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct TwoDimensionalIntVariableArray(usize);
+
+impl TwoDimensionalIntVariableArray {
+    pub fn get(&self, model: &Model, row: usize, column: usize) -> IntVariable {
+        let (_, (range, num_columns)) = &model.two_dimensional_arrays[self.0];
+        let elem = (row * num_columns) + column;
+
+        IntVariable {
+            scale: 1,
+            offset: 0,
+            id: range
+                .clone()
+                .nth(elem)
+                .expect("Expected row and column to be in range"),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct IntVariableArray(usize);
 
 impl IntVariableArray {
@@ -311,6 +357,7 @@ impl IntVariableArray {
 pub enum Output {
     Variable(IntVariable),
     Array(IntVariableArray),
+    TwoDimensionalArray(TwoDimensionalIntVariableArray),
 }
 
 #[derive(Clone, Debug)]
@@ -318,6 +365,7 @@ pub struct VariableMap {
     variables: Vec<AffineView<DomainId>>,
     names: Vec<String>,
     arrays: Vec<(String, Range<usize>)>,
+    two_dimensional_arrays: Vec<(String, (Range<usize>, usize))>,
 }
 
 impl VariableMap {
@@ -358,6 +406,10 @@ impl VariableMap {
             }
 
             Output::Array(int_variable_array) => self.arrays[int_variable_array.0].0.clone(),
+            Output::TwoDimensionalArray(two_dimensional_int_variable_array) => self
+                .two_dimensional_arrays[two_dimensional_int_variable_array.0]
+                .0
+                .clone(),
         }
     }
 
@@ -367,6 +419,19 @@ impl VariableMap {
         (range.start..range.end)
             .map(|idx| self.variables[idx].clone())
             .collect()
+    }
+
+    pub fn get_matrix(
+        &self,
+        array: TwoDimensionalIntVariableArray,
+    ) -> Vec<Vec<AffineView<DomainId>>> {
+        let (_, (range, num_columns)) = &self.two_dimensional_arrays[array.0];
+        (range.start..range.end)
+            .map(|id| self.variables[id].clone())
+            .collect::<Vec<_>>()
+            .chunks(*num_columns)
+            .map(|chunk| chunk.to_vec())
+            .collect::<Vec<_>>()
     }
 }
 

@@ -75,17 +75,10 @@ use crate::statistics::log_statistic_postfix;
 ///
 /// # Using the Solver
 /// For examples on how to use the solver, see the [root-level crate documentation](crate) or [one of these examples](https://github.com/ConSol-Lab/Pumpkin/tree/master/pumpkin-lib/examples).
+#[derive(Default)]
 pub struct Solver {
     /// The internal [`ConstraintSatisfactionSolver`] which is used to solve the problems.
     pub(crate) satisfaction_solver: ConstraintSatisfactionSolver,
-}
-
-impl Default for Solver {
-    fn default() -> Self {
-        Self {
-            satisfaction_solver: Default::default(),
-        }
-    }
 }
 
 impl std::fmt::Debug for Solver {

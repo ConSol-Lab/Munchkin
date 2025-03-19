@@ -267,6 +267,28 @@ fn print_output(output: &Output, solver_variables: &VariableMap, solution: &Solu
             }
             println!("];");
         }
+        Output::TwoDimensionalArray(matrix) => {
+            println!("{name} =");
+            print!("[| ");
+            for (index, for_i) in solver_variables.get_matrix(*matrix).into_iter().enumerate() {
+                if index == 0 {
+                } else {
+                    print!(" | ");
+                }
+                for variable in for_i.iter() {
+                    let value = solution.get_integer_value(variable.clone());
+
+                    if value == 0 {
+                        print!("false");
+                    } else if value == 1 {
+                        print!("true");
+                    } else {
+                        panic!("For now we have just implemented this for 2D boolean arrays")
+                    }
+                }
+            }
+            println!("];");
+        }
     }
 }
 
