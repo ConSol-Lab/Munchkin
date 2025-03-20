@@ -21,13 +21,13 @@ use crate::proof::checking::Atomic;
 fn valid_rhs_upper_bound_based_on_upper_bounds_of_array_elements() {
     test_element_checker(
         vec![
-            atomic("array_3", LessThanEqual, 3),
-            atomic("array_4", LessThanEqual, 5),
-            atomic("array_2", LessThanEqual, 2),
-            atomic("array_1", LessThanEqual, 1),
+            atomic("array_3", LessThanEqual, 8),
+            atomic("array_4", LessThanEqual, 7),
+            atomic("array_2", LessThanEqual, 6),
+            atomic("array_1", LessThanEqual, 5),
         ],
-        atomic("rhs", LessThanEqual, 5),
-        Validity::Invalid,
+        atomic("rhs", LessThanEqual, 8),
+        Validity::Valid,
     )
 }
 
@@ -35,9 +35,9 @@ fn valid_rhs_upper_bound_based_on_upper_bounds_of_array_elements() {
 fn invalid_rhs_bounds_conclusion() {
     test_element_checker(
         vec![
-            atomic("array_3", LessThanEqual, 3),
-            atomic("array_2", LessThanEqual, 2),
-            atomic("array_1", LessThanEqual, 1),
+            atomic("array_3", LessThanEqual, 5),
+            atomic("array_2", LessThanEqual, 5),
+            atomic("array_1", LessThanEqual, 5),
         ],
         atomic("rhs", LessThanEqual, 5),
         Validity::Invalid,
@@ -48,12 +48,12 @@ fn invalid_rhs_bounds_conclusion() {
 fn valid_rhs_lower_bound_based_on_lower_bounds_of_array_elements() {
     test_element_checker(
         vec![
-            atomic("array_3", GreaterThanEqual, 3),
-            atomic("array_4", GreaterThanEqual, 5),
-            atomic("array_2", GreaterThanEqual, 2),
-            atomic("array_1", GreaterThanEqual, 1),
+            atomic("array_3", GreaterThanEqual, 9),
+            atomic("array_4", GreaterThanEqual, 8),
+            atomic("array_2", GreaterThanEqual, 7),
+            atomic("array_1", GreaterThanEqual, 6),
         ],
-        atomic("rhs", GreaterThanEqual, 5),
+        atomic("rhs", GreaterThanEqual, 6),
         Validity::Valid,
     )
 }
@@ -63,11 +63,11 @@ fn valid_rhs_bound_if_index_is_constrained() {
     test_element_checker(
         vec![
             atomic("index", GreaterThanEqual, 2),
-            atomic("index", LessThanEqual, 3),
-            atomic("array_2", LessThanEqual, 3),
-            atomic("array_3", LessThanEqual, 3),
+            atomic("index", LessThanEqual, 5),
+            atomic("array_2", LessThanEqual, 5),
+            atomic("array_3", LessThanEqual, 5),
         ],
-        atomic("rhs", LessThanEqual, 3),
+        atomic("rhs", LessThanEqual, 5),
         Validity::Valid,
     )
 }

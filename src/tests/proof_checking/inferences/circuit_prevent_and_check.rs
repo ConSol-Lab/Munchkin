@@ -48,7 +48,7 @@ fn invalid_sub_circuit_detection() {
 #[test]
 fn invalid_sub_circuit_detection_2() {
     test_circuit_checker(
-        vec![atomic("array_3", Equal, 2), atomic("array_2", Equal, 3)],
+        vec![atomic("array_3", Equal, 2), atomic("array_2", Equal, 4)],
         None,
         Validity::Invalid,
     );

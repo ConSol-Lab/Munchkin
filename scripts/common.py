@@ -131,6 +131,7 @@ def check_runs(context: Context) -> bool:
         for wrong_optimality_instance in wrong_optimality_instances:
             print(f"{bcolors.FAIL}\t{wrong_optimality_instance}{bcolors.ENDC}")
 
+    if len(wrong_optimality_instances) > 0 or len(wrong_solution_instances) > 0:
         return False
 
     return True

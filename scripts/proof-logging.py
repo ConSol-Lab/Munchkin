@@ -27,7 +27,7 @@ def process_proof(context: Context, run_dir: Path):
     with log_file_path.open('w') as log_file:
         with err_file_path.open('w') as err_file:
             run(
-                [context.executable, instance, "process", scaffold_path, proof_path],
+                [context.executable, instance, "processing", scaffold_path, proof_path],
                 stdout=log_file,
                 stderr=err_file,
             ) 
@@ -49,7 +49,7 @@ def check_proof(context: Context, run_dir: Path):
     with log_file_path.open('w') as log_file:
         with err_file_path.open('w') as err_file:
             result = run(
-                [context.executable, instance, "check", proof_path],
+                [context.executable, instance, "verify", proof_path],
                 stdout=log_file,
                 stderr=err_file,
             ) 
