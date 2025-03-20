@@ -76,7 +76,11 @@ pub enum OptimisationStrategy {
     /// objective variable until a SAT result is reached. Can be seen as lower-bounding search.
     LinearUnsatSat,
     /// Core-guided Search - Iteratively extracts cores based on a set of conflicting assumptions
-    CoreGuided,
+    /// using the OLL approach
+    OLL,
+    /// Core-guided Search - Iteratively extracts cores based on a set of conflicting assumptions
+    /// using the Implicit Hitting Sets approach
+    IHS,
     /// Logic-based Benders Decomposition - Splits the problem into a main problem and subproblem.
     /// Iteratively adds cuts to the main problem based on the subproblem until the optimal
     /// solution is found
@@ -88,7 +92,8 @@ impl Display for OptimisationStrategy {
         match self {
             OptimisationStrategy::LinearSatUnsat => write!(f, "linear-sat-unsat"),
             OptimisationStrategy::LinearUnsatSat => write!(f, "linear-unsat-sat"),
-            OptimisationStrategy::CoreGuided => write!(f, "core-guided"),
+            OptimisationStrategy::OLL => write!(f, "oll"),
+            OptimisationStrategy::IHS => write!(f, "ihs"),
             OptimisationStrategy::LBBD => write!(f, "lbbd"),
         }
     }

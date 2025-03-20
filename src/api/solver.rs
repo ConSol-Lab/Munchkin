@@ -1,6 +1,7 @@
 use std::num::NonZero;
 
 use super::outputs::SolutionReference;
+use super::predicates::IntegerPredicate;
 use super::results::OptimisationResult;
 use super::results::SatisfactionResult;
 use super::results::SatisfactionResultUnderAssumptions;
@@ -155,6 +156,13 @@ impl Solver {
     /// ```
     pub fn get_literal(&self, predicate: Predicate) -> Literal {
         self.satisfaction_solver.get_literal(predicate)
+    }
+
+    /// Returns the predicate(s) linked to the provided `literal`.
+    pub fn get_predicates(&self, literal: Literal) -> impl Iterator<Item = IntegerPredicate> + '_ {
+        self.satisfaction_solver
+            .variable_literal_mappings
+            .get_predicates_for_literal(literal)
     }
 
     /// Get the value of the given [`Literal`] at the root level (after propagation), which could be

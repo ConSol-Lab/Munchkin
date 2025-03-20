@@ -20,9 +20,10 @@ use crate::model::Model;
 use crate::model::Output;
 use crate::model::VariableMap;
 use crate::optimisation::linear_sat_unsat::LinearSatUnsat;
-use crate::optimisation::CoreGuidedSearch;
 use crate::optimisation::LinearUnsatSat;
 use crate::optimisation::OptimisationStrategy;
+use crate::optimisation::IHS;
+use crate::optimisation::OLL as Oll;
 use crate::options::SolverOptions;
 use crate::predicate;
 use crate::proof::checking::verify_proof;
@@ -270,7 +271,7 @@ pub fn solve<SearchStrategies>(
             &mut time_budget,
             LinearUnsatSat::new(Minimise, objective_variable.clone(), solution_callback),
         ),
-        OptimisationStrategy::CoreGuided => {
+        OptimisationStrategy::OLL => {
             let objective_function = instance
                 .objective_function()
                 .into_iter()
@@ -279,7 +280,29 @@ pub fn solve<SearchStrategies>(
             solver.optimise(
                 &mut brancher,
                 &mut time_budget,
-                CoreGuidedSearch::new(Minimise, objective_function, solution_callback),
+                Oll::new(
+                    Minimise,
+                    objective_function,
+                    objective_variable.clone(),
+                    solution_callback,
+                ),
+            )
+        }
+        OptimisationStrategy::IHS => {
+            let objective_function = instance
+                .objective_function()
+                .into_iter()
+                .map(|var| solver_variables.to_solver_variable(var))
+                .collect::<Vec<_>>();
+            solver.optimise(
+                &mut brancher,
+                &mut time_budget,
+                IHS::new(
+                    Minimise,
+                    objective_function,
+                    objective_variable.clone(),
+                    solution_callback,
+                ),
             )
         }
         OptimisationStrategy::LBBD => todo!(),
