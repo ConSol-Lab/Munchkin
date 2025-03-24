@@ -8,7 +8,7 @@ import shutil
 import sys
 import json
 
-ModelType = Union[Literal["tsp"], Literal["rcpsp"]] 
+ModelType = Union[Literal["tsp"], Literal["rcpsp"], Literal["cluster_editing"]] 
 
 DATA_DIR = (Path(__file__).parent / ".." / "data").resolve()
 EXPERIMENT_DIR = (Path(__file__).parent / ".." / "experiments").resolve()
@@ -16,11 +16,13 @@ EXPERIMENT_DIR = (Path(__file__).parent / ".." / "experiments").resolve()
 INSTANCES = {
     "tsp": (DATA_DIR / "tsp"),
     "rcpsp": (DATA_DIR / "rcpsp"),
+    "cluster_editing": (DATA_DIR / "cluster-editing")
 }
 
 MINIZINC_MODELS = {
     "tsp": (Path(__file__).parent / ".." / "models" / "tsp.mzn").resolve(),
     "rcpsp": (Path(__file__).parent / ".." / "models" / "rcpsp.mzn").resolve(),
+    "cluster_editing": (Path(__file__).parent / ".." / "models" / "cluster_editing.mzn").resolve()
 }
 
 SOLUTION_SEPARATOR = "-" * 10
@@ -295,7 +297,14 @@ class Args:
     explanation_checks: bool
     """If true, enables the explanation checks"""
 
-
+    def __init__(self, model: ModelType, timeout: int, flags=[], with_proofs=False, allow_dirty=False, explanation_checks= False):
+        self.model = model
+        self.timeout = timeout
+        self.flags = flags
+        self.with_proofs = with_proofs
+        self.allow_dirty = allow_dirty
+        self.explanation_checks = explanation_checks
+    
 @dataclass 
 class GitStatus:
     has_dirty_files: bool
