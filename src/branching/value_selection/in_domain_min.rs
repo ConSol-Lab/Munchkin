@@ -33,7 +33,7 @@ impl ValueSelector<PropositionalVariable> for InDomainMin {
 #[cfg(test)]
 mod tests {
     use crate::basic_types::tests::TestRandom;
-    use crate::branching::InDomainMin;
+    use crate::branching::InDomainMax;
     use crate::branching::SelectionContext;
     use crate::branching::ValueSelector;
     use crate::predicate;
@@ -50,7 +50,7 @@ mod tests {
         );
         let domain_ids = context.get_domains().collect::<Vec<_>>();
 
-        let mut selector = InDomainMin;
+        let mut selector = InDomainMax;
 
         let selected_predicate = selector.select_value(&mut context, domain_ids[0]);
         assert_eq!(selected_predicate, predicate!(domain_ids[0] <= 0))

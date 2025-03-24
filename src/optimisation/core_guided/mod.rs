@@ -4,4 +4,4 @@ pub(crate) use oll::*;
 pub(crate) mod implicit_hitting_sets;
 pub(crate) use implicit_hitting_sets::*;
 
-mod core_minimisation;
+pub(crate) mod core_minimisation;
