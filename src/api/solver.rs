@@ -22,8 +22,10 @@ use crate::engine::variables::DomainId;
 use crate::engine::variables::IntegerVariable;
 use crate::engine::variables::Literal;
 use crate::engine::ConstraintSatisfactionSolver;
+use crate::munchkin_assert_simple;
 use crate::optimisation::OptimisationProcedure;
 use crate::options::SolverOptions;
+use crate::predicate;
 use crate::results::solution_iterator::SolutionIterator;
 use crate::results::unsatisfiable::UnsatisfiableUnderAssumptions;
 use crate::statistics::log_statistic;
@@ -156,6 +158,31 @@ impl Solver {
     /// ```
     pub fn get_literal(&self, predicate: Predicate) -> Literal {
         self.satisfaction_solver.get_literal(predicate)
+    }
+
+    /// Creates a new 0-1 integer variable `var` and links it such that `var <-> predicate`.
+    pub fn new_variable_for_predicate(&mut self, predicate: Predicate) -> DomainId {
+        let literal = self.get_literal(predicate);
+        let variable = self.new_bounded_integer(0, 1);
+
+        let variable_is_true = self.get_literal(predicate!(variable >= 1));
+
+        // We add the constraint literal <-> variable
+        //
+        // First we add literal -> variable
+        let result = self.add_clause([!literal, variable_is_true]);
+        munchkin_assert_simple!(
+            result.is_ok(),
+            "Expected result to be okay but was {result:?}"
+        );
+        // Then we add literal <- variable
+        let result = self.add_clause([!variable_is_true, literal]);
+        munchkin_assert_simple!(
+            result.is_ok(),
+            "Expected result to be okay but was {result:?}"
+        );
+
+        variable
     }
 
     /// Returns the predicate(s) linked to the provided `literal`.
@@ -374,10 +401,10 @@ impl Solver {
     /// terminate by the provided [`TerminationCondition`]) and returns a [`SatisfactionResult`]
     /// which can be used to obtain the found solution or find other solutions.
     ///
-    /// This method takes as input a list of [`Literal`]s which represent so-called assumptions (see
-    /// \[1\] for a more detailed explanation). The [`Literal`]s corresponding to [`Predicate`]s
-    /// over [`IntegerVariable`]s (e.g. lower-bound predicates) can be retrieved from the [`Solver`]
-    /// using [`Solver::get_literal`].
+    /// This method takes as input a list of [`Predicate`]s which represent so-called assumptions
+    /// (see \[1\] for a more detailed explanation). The [`Literal`]s corresponding to
+    /// [`Predicate`]s over [`IntegerVariable`]s (e.g. lower-bound predicates) can be retrieved
+    /// from the [`Solver`] using [`Solver::get_literal`].
     ///
     /// # Bibliography
     /// \[1\] N. Eén and N. Sörensson, ‘Temporal induction by incremental SAT solving’, Electronic
@@ -386,12 +413,16 @@ impl Solver {
         &'this mut self,
         brancher: &'brancher mut B,
         termination: &mut T,
-        assumptions: &[Literal],
+        assumptions: &[Predicate],
     ) -> SatisfactionResultUnderAssumptions<'this, 'brancher, B> {
-        match self
-            .satisfaction_solver
-            .solve_under_assumptions(assumptions, termination, brancher)
-        {
+        match self.satisfaction_solver.solve_under_assumptions(
+            &assumptions
+                .iter()
+                .map(|predicate| self.get_literal(*predicate))
+                .collect::<Vec<_>>(),
+            termination,
+            brancher,
+        ) {
             CSPSolverExecutionFlag::Feasible => {
                 let solution: Solution = self.satisfaction_solver.get_solution_reference().into();
                 // Reset the state whenever we return a result

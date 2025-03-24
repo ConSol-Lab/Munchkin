@@ -10,7 +10,7 @@ use crate::Solver;
 /// Implements the core-guided search optimisation procedure.
 #[derive(Debug, Clone)]
 #[allow(unused, reason = "Will be used in the assignments")]
-pub(crate) struct IHS<Var, Callback> {
+pub(crate) struct ImplicitHittingSets<Var, Callback> {
     direction: OptimisationDirection,
     /// The linear objective function which is being optimised
     objective_function: Vec<Var>,
@@ -19,7 +19,7 @@ pub(crate) struct IHS<Var, Callback> {
     solution_callback: Callback,
 }
 
-impl<Var, Callback> IHS<Var, Callback>
+impl<Var, Callback> ImplicitHittingSets<Var, Callback>
 where
     // The trait bound here is not common; see
     // linear_unsat_sat for more info.
@@ -42,7 +42,7 @@ where
     }
 }
 
-impl<Var, Callback> OptimisationProcedure<Callback> for IHS<Var, Callback>
+impl<Var, Callback> OptimisationProcedure<Callback> for ImplicitHittingSets<Var, Callback>
 where
     Var: IntegerVariable,
     Callback: Fn(&Solver, SolutionReference),
@@ -69,6 +69,8 @@ where
         // - [`Solver::add_constraint`] allows you to add additional constraints
         // - [`Solver::new_bounded_integer`] allows you to create a new integer variable
         // - [`Solver::default`] allows you to create a default solver with no constraints.
+        // - [`Solver::new_variable_for_predicate`] creates a 0-1 integer variable corresponding to
+        //   a predicate such that it can be used in linear sums.
         //
         // We recommend calling [`Self::update_best_solution_and_process`] when you find a
         // solution.

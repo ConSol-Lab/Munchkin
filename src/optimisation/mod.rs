@@ -81,10 +81,6 @@ pub enum OptimisationStrategy {
     /// Core-guided Search - Iteratively extracts cores based on a set of conflicting assumptions
     /// using the Implicit Hitting Sets approach
     IHS,
-    /// Logic-based Benders Decomposition - Splits the problem into a main problem and subproblem.
-    /// Iteratively adds cuts to the main problem based on the subproblem until the optimal
-    /// solution is found
-    LBBD,
 }
 
 impl Display for OptimisationStrategy {
@@ -94,7 +90,6 @@ impl Display for OptimisationStrategy {
             OptimisationStrategy::LinearUnsatSat => write!(f, "linear-unsat-sat"),
             OptimisationStrategy::OLL => write!(f, "oll"),
             OptimisationStrategy::IHS => write!(f, "ihs"),
-            OptimisationStrategy::LBBD => write!(f, "lbbd"),
         }
     }
 }

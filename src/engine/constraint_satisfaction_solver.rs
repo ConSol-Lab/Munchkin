@@ -373,6 +373,14 @@ impl ConstraintSatisfactionSolver {
     pub(crate) fn declare_ready(&mut self) {
         self.state.declare_ready()
     }
+
+    pub(crate) fn get_predicate(&self, literal: Literal) -> Predicate {
+        self.variable_literal_mappings
+            .get_predicates_for_literal(literal)
+            .next()
+            .expect("Expected at least a single predicate to be attached to the variable")
+            .into()
+    }
 }
 
 // methods that offer basic functionality

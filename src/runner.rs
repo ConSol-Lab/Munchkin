@@ -25,10 +25,10 @@ use crate::model::Model;
 use crate::model::Output;
 use crate::model::VariableMap;
 use crate::optimisation::linear_sat_unsat::LinearSatUnsat;
+use crate::optimisation::ImplicitHittingSets;
 use crate::optimisation::LinearUnsatSat;
+use crate::optimisation::Oll;
 use crate::optimisation::OptimisationStrategy;
-use crate::optimisation::IHS;
-use crate::optimisation::OLL as Oll;
 use crate::options::SolverOptions;
 use crate::predicate;
 use crate::proof::checking::state::CheckingState;
@@ -304,7 +304,7 @@ pub fn solve<SearchStrategies>(
             solver.optimise(
                 &mut brancher,
                 &mut time_budget,
-                IHS::new(
+                ImplicitHittingSets::new(
                     Minimise,
                     objective_function,
                     objective_variable.clone(),
@@ -312,7 +312,6 @@ pub fn solve<SearchStrategies>(
                 ),
             )
         }
-        OptimisationStrategy::LBBD => todo!(),
     };
 
     match result {

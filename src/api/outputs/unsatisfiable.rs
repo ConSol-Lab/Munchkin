@@ -2,7 +2,7 @@
 
 use crate::branching::Brancher;
 use crate::engine::ConstraintSatisfactionSolver;
-use crate::variables::Literal;
+use crate::predicates::Predicate;
 #[cfg(doc)]
 use crate::Solver;
 
@@ -37,8 +37,12 @@ impl<'solver, 'brancher, B: Brancher> UnsatisfiableUnderAssumptions<'solver, 'br
     /// `all-different(x, y, z)` then the assumptions `[[x = 1], [y <= 1], [y != 0]]` would
     /// constitute an unsatisfiable core since the constraint and the assumptions can never be
     /// satisfied at the same time.
-    pub fn extract_core(&mut self) -> Vec<Literal> {
-        self.solver.extract_core(self.brancher)
+    pub fn extract_core(&mut self) -> Vec<Predicate> {
+        self.solver
+            .extract_core(self.brancher)
+            .into_iter()
+            .map(|literal| self.solver.get_predicate(literal))
+            .collect()
     }
 }
 
