@@ -41,7 +41,7 @@ CORE_MINIMISATION_CONTRIBUTION = 5
 
 
 def grade_optimisation(optimisation: str, model: ModelType, first_run=False) -> bool:
-    """Grade a conflict analysis procedure given the propagators and model. Return the contribution to the final grade for this conflict analysis procedure."""
+    """Grade an optimisation procedure given the optimisation strategy and model. Return the contribution to the final grade for this optimisation procedure."""
 
     if first_run:
         test_filter = f"tests::optimisation::{OPTIMISATION_TEST_MODULES[optimisation]}"
@@ -70,7 +70,7 @@ def grade_optimisation(optimisation: str, model: ModelType, first_run=False) -> 
     return True
 
 def grade_core_minimisation() -> int:
-    """Grade a conflict analysis procedure given the propagators and model. Return the contribution to the final grade for this conflict analysis procedure."""
+    """Grade core minimisation by running the unit tests and running it on the cluster editing model using OLL. Return the contribution to the final grade for core minimisation."""
 
     test_filter = f"tests::optimisation::{CORE_MINIMISATION_TEST_MODULE}"
     result = subprocess.run(
