@@ -164,7 +164,7 @@ pub struct ConstraintSatisfactionSolver {
     true_literal: Literal,
     false_literal: Literal,
     /// A set of counters updated during the search.
-    counters: Counters,
+    pub(crate) counters: Counters,
     /// Miscellaneous constant parameters used by the solver.
     internal_parameters: SatisfactionSolverOptions,
     /// The names of the variables in the solver.
@@ -1011,6 +1011,8 @@ impl ConstraintSatisfactionSolver {
             self.restore_state_at_root(brancher);
         }
 
+        self.counters.average_core_size.add_term(core.len() as u64);
+
         core
     }
 
@@ -1532,7 +1534,7 @@ impl ConstraintSatisfactionSolver {
 }
 
 #[derive(Default, Debug, Copy, Clone)]
-pub(crate) struct CumulativeMovingAverage {
+pub struct CumulativeMovingAverage {
     sum: u64,
     num_terms: u64,
 }
@@ -1576,10 +1578,7 @@ pub(crate) struct Counters {
     average_number_of_literals_removed_minimisation: CumulativeMovingAverage,
 
     pub(crate) average_core_size: CumulativeMovingAverage,
-    pub(crate) average_number_of_literals_removed_by_core_minimisation: CumulativeMovingAverage,
-
-    pub(crate) number_of_generated_cuts: u64,
-    pub(crate) average_size_of_cuts: CumulativeMovingAverage,
+    pub(crate) average_number_of_elements_removed_by_core_minimisation: CumulativeMovingAverage,
 }
 
 impl Counters {
@@ -1626,15 +1625,12 @@ impl Counters {
             self.average_number_of_literals_removed_minimisation.value(),
         );
 
-        log_statistic("averageCoreSize", self.average_core_size.value());
+        log_statistic("averageCoreSizeBeforeMinimisation", self.average_core_size.value());
         log_statistic(
-            "averageNumberOfLiteralsRemovedCoreMinimisation",
-            self.average_number_of_literals_removed_by_core_minimisation
+            "averageNumberOfElementsRemovedCoreMinimisation",
+            self.average_number_of_elements_removed_by_core_minimisation
                 .value(),
         );
-
-        log_statistic("numberOfGeneratedCuts", self.number_of_generated_cuts);
-        log_statistic("averageSizeOfCuts", self.average_size_of_cuts.value());
     }
 }
 

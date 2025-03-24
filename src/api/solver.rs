@@ -15,6 +15,7 @@ use crate::branching::value_selection::ValueSelector;
 use crate::branching::variable_selection::VariableSelector;
 use crate::branching::Brancher;
 use crate::constraints::ConstraintPoster;
+use crate::engine::constraint_satisfaction_solver::CumulativeMovingAverage;
 use crate::engine::cp::propagation::Propagator;
 use crate::engine::predicates::predicate::Predicate;
 use crate::engine::termination::TerminationCondition;
@@ -196,6 +197,13 @@ impl Solver {
     /// unassigned.
     pub fn get_literal_value(&self, literal: Literal) -> Option<bool> {
         self.satisfaction_solver.get_literal_value(literal)
+    }
+
+    pub fn get_minimisation_statistics(&mut self) -> &CumulativeMovingAverage {
+        &mut self
+            .satisfaction_solver
+            .counters
+            .average_number_of_elements_removed_by_core_minimisation
     }
 
     /// Get a literal which is globally true.
