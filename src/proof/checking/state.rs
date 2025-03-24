@@ -51,6 +51,8 @@ impl CheckingState {
             variable_map: &self.variable_map,
             nogoods: &self.nogoods,
             inferences: &self.inferences,
+            variables_in_step: vec![],
+            proof_step_conclusion: None,
         }
     }
 
@@ -98,6 +100,12 @@ impl CheckingState {
             None => Ok(()),
         }
     }
+
+    pub(crate) fn set_objective_bound(&mut self, atomic: Atomic) -> anyhow::Result<()> {
+        let predicate = to_integer_predicate(&self.variable_map, &atomic)?;
+        self.assignment.apply_integer_predicate(!predicate, None)?;
+        Ok(())
+    }
 }
 
 /// A snapshot of the checking state. Step checkers can modify the domains of variables through
@@ -109,10 +117,37 @@ pub(crate) struct CheckingContext<'a> {
     assignment: &'a mut AssignmentsInteger,
     nogoods: &'a BTreeMap<StepId, Vec<Atomic>>,
     inferences: &'a BTreeMap<StepId, (Vec<Atomic>, Option<Atomic>)>,
+    variables_in_step: Vec<Atomic>,
+    proof_step_conclusion: Option<Atomic>,
 }
 
 #[allow(unused, reason = "will be used in the assignment")]
 impl CheckingContext<'_> {
+    /// Set the variables that are involved in the proof step being checked.
+    pub(crate) fn set_proof_step_premises(&mut self, variables: impl IntoIterator<Item = Atomic>) {
+        self.variables_in_step.extend(variables);
+    }
+
+    /// Set the variables that are involved in the proof step being checked.
+    pub(crate) fn set_proof_step_conclusion(&mut self, atomic: Atomic) {
+        self.proof_step_conclusion = Some(atomic);
+    }
+
+    /// Test whether the given variable is part of the left-hand side of the proof step implication.
+    pub(crate) fn is_part_of_proof_step_left_hand_side(&self, variable: IntVariable) -> bool {
+        self.variables_in_step
+            .iter()
+            .any(|atomic| self.model.get_name(variable) == atomic.name)
+    }
+
+    /// Test whether the given variable is the conclusion of the proof step implication.
+    pub(crate) fn is_proof_step_conclusion(&self, variable: IntVariable) -> bool {
+        self.proof_step_conclusion
+            .as_ref()
+            .map(|atomic| self.model.get_name(variable) == atomic.name)
+            .unwrap_or_default()
+    }
+
     /// Apply the given atomic to the context.
     ///
     /// Returns an error in one of the following cases:
@@ -295,6 +330,20 @@ mod tests {
             let context = state.as_context();
             assert_eq!(1, context.lower_bound(x));
         }
+    }
+
+    #[test]
+    fn variables_can_be_retrieved_from_proof_step() {
+        let mut model = Model::default();
+        let x = model.new_interval_variable("x", 1, 10);
+        let y = model.new_interval_variable("y", 1, 10);
+
+        let mut state = CheckingState::from(model);
+        let mut context = state.as_context();
+        context.set_proof_step_premises([atomic("x", GreaterThanEqual, 3)]);
+
+        assert!(context.is_part_of_proof_step_left_hand_side(x));
+        assert!(!context.is_proof_step_conclusion(y));
     }
 
     #[test]

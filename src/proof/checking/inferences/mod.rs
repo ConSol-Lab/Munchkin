@@ -20,6 +20,8 @@ pub(super) fn verify(
     label: &str,
     mut context: CheckingContext,
 ) -> anyhow::Result<()> {
+    context.set_proof_step_premises(premises.clone());
+
     // First we apply the premises and propagated atomics.
     premises
         .iter()
@@ -31,6 +33,7 @@ pub(super) fn verify(
         })?;
 
     if let Some(ref propagated) = propagated {
+        context.set_proof_step_conclusion(propagated.clone());
         context.apply(&negate(propagated)).map_err(|_| {
             anyhow::anyhow!(
                 "The negation of the conclusion in an inference should not be mutually exclusive with the premises."

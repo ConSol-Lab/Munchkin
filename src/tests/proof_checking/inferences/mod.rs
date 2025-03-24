@@ -21,6 +21,7 @@ pub(crate) fn test_step_checker(
 ) {
     let mut state = CheckingState::from(model);
     let mut context = state.as_context();
+    context.set_proof_step_premises(premises.clone());
 
     premises
         .iter()
@@ -28,6 +29,7 @@ pub(crate) fn test_step_checker(
         .unwrap();
 
     if let Some(propagated) = propagated {
+        context.set_proof_step_conclusion(propagated.clone());
         context.apply(&negate(&propagated)).unwrap();
     }
 

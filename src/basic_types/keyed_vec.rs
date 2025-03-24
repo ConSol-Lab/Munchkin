@@ -1,4 +1,5 @@
 use std::marker::PhantomData;
+use std::num::NonZero;
 use std::ops::Index;
 use std::ops::IndexMut;
 
@@ -62,7 +63,6 @@ impl<Key: StorageKey, Value> KeyedVec<Key, Value> {
 
 #[allow(unused, reason = "-")]
 impl<Key: StorageKey, Value: Clone> KeyedVec<Key, Value> {
-
     /// Insert a specific key-value pair. If an item already exists with the given key, it is
     /// overwritten.
     pub(crate) fn insert_with_default(&mut self, key: Key, mut value: Value, default_value: Value) {
@@ -117,6 +117,17 @@ impl StorageKey for usize {
         index
     }
 }
+
+impl StorageKey for NonZero<u32> {
+    fn index(&self) -> usize {
+        self.get() as usize - 1
+    }
+
+    fn create_from_index(index: usize) -> Self {
+        Self::new(index as u32 + 1).unwrap()
+    }
+}
+
 /// A simple trait which requires that the structures implementing this trait can generate an index.
 pub(crate) trait StorageKey: Clone {
     fn index(&self) -> usize;

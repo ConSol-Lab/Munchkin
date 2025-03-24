@@ -177,6 +177,11 @@ impl Model {
     pub(crate) fn get_constraint_by_id(&self, constraint_id: NonZero<u32>) -> Option<&Constraint> {
         self.constraints.get(constraint_id.get() as usize - 1)
     }
+
+    /// Get the name of the given variable.
+    pub(crate) fn get_name(&self, variable: IntVariable) -> &str {
+        &self.variables[variable.id].0
+    }
 }
 
 fn add_constraints(

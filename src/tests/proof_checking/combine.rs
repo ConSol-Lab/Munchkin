@@ -111,7 +111,7 @@ fn valid_combination_including_nogood() {
 
     checking::combine::verify(
         vec![l1, l2],
-        vec![step_id_1, step_id_2, step_id_3],
+        vec![step_id_3, step_id_2, step_id_1],
         &mut state.as_context(),
     )
     .expect("valid combine");

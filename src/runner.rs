@@ -1,11 +1,16 @@
 use std::any::Any;
 use std::fs::File;
+use std::io::Read;
+use std::path::Path;
 use std::path::PathBuf;
 use std::time::Duration;
 
 use anyhow::Context;
 use clap::ValueEnum;
+use drcp_format::reader::LiteralAtomicMap;
 use drcp_format::reader::ProofReader;
+use drcp_format::steps::Conclusion;
+use drcp_format::steps::Step;
 use drcp_format::LiteralDefinitions;
 
 use self::termination::TerminationCondition;
@@ -26,10 +31,12 @@ use crate::optimisation::IHS;
 use crate::optimisation::OLL as Oll;
 use crate::options::SolverOptions;
 use crate::predicate;
+use crate::proof::checking::state::CheckingState;
 use crate::proof::checking::verify_proof;
 use crate::proof::processing::process_proof;
 use crate::proof::processing::Processor;
 use crate::proof::Proof;
+use crate::proof::ProofLiterals;
 use crate::results::OptimisationResult;
 use crate::results::ProblemSolution;
 use crate::results::SolutionReference;
@@ -392,49 +399,92 @@ fn print_output(output: &Output, solver_variables: &VariableMap, solution: &Solu
 
 pub fn verify(model: Model, proof_path: PathBuf) -> anyhow::Result<()> {
     // First, we read the contents of the `.drcp` and `.lits` files.
+    let proof = create_proof_reader_for_checker(&proof_path)?;
+    let conclusion = find_conclusion(proof)?;
+
+    // Finally, we can run the checker, giving it the proof reader and the model.
+    let proof = create_proof_reader_for_checker(&proof_path)?;
+    let mut state = CheckingState::from(model);
+    if let Conclusion::Optimal(drcp_format::AtomicConstraint::Int(atomic)) = conclusion {
+        state.set_objective_bound(atomic).map_err(|_| {
+            anyhow::anyhow!("Negating the objective already leads to an empty domain.")
+        })?;
+    }
+    verify_proof(state, proof)
+}
+
+fn create_proof_reader_for_checker(
+    proof_path: &Path,
+) -> anyhow::Result<ProofReader<File, LiteralDefinitions<String>>> {
     let lits_file = proof_path.with_extension("lits");
     let lits = File::open(&lits_file)
         .with_context(|| format!("Failed to open {}", lits_file.display()))?;
-    let proof_file = File::open(&proof_path)
+    let proof_file = File::open(proof_path)
         .with_context(|| format!("Failed to open {}", proof_path.display()))?;
-
-    // Then, we parse the literal definitions from the `.lits` file.
     let literals = LiteralDefinitions::<String>::parse(lits).with_context(|| {
         format!(
             "Failed to parse literal definition from {}",
             lits_file.display()
         )
     })?;
-
-    // Using the literal defintions, we can parse the proof steps from the `.drcp` file.
     let proof = ProofReader::new(proof_file, literals);
-
-    // Finally, we can run the checker, giving it the proof reader and the model.
-    verify_proof(model, proof)
+    Ok(proof)
 }
 
 fn process(model: Model, scaffold: PathBuf, output: PathBuf) -> anyhow::Result<()> {
     // First, we create a processor from the model.
-    let processor = Processor::from(model);
+    let mut processor = Processor::from(model);
 
     // Then, we read the contents of the `.drcp` and `.lits` files.
-    let lits_file = scaffold.with_extension("lits");
-    let lits = File::open(&lits_file)
-        .with_context(|| format!("Failed to open {}", lits_file.display()))?;
-    let proof_file =
-        File::open(&scaffold).with_context(|| format!("Failed to open {}", scaffold.display()))?;
+    let initial_reader = create_proof_reader(&processor, &scaffold)?;
 
-    // Then, we parse the literal definitions from the `.lits` file.
-    let definitions = LiteralDefinitions::<String>::parse(lits).with_context(|| {
-        format!(
-            "Failed to parse literal definition from {}",
-            lits_file.display()
-        )
-    })?;
+    // We patch the negation of the conclusion into the processor. The change in how optimisation
+    // is done breaks how the processor could work previously.
+    let conclusion = find_conclusion(initial_reader)?;
+    if let Conclusion::Optimal(bound) = conclusion {
+        processor.set_objective_bound(bound);
+    }
 
-    // Using the literal defintions, we can parse the proof steps from the `.drcp` file.
-    let proof = ProofReader::new(proof_file, processor.initialise_proof_literals(definitions));
+    let proof = create_proof_reader(&processor, &scaffold)?;
 
     // Then, we can run the processor giving it the model, the proof reader and the output path.
     process_proof(processor, proof, output)
+}
+
+fn find_conclusion<R: Read, Atomics: LiteralAtomicMap>(
+    mut proof: ProofReader<R, Atomics>,
+) -> anyhow::Result<Conclusion<Atomics::Atomic>> {
+    while let Some(step) = proof.next_step()? {
+        if let Step::Conclusion(conclusion) = step {
+            return Ok(conclusion);
+        }
+    }
+
+    anyhow::bail!("Cannot find conclusion in proof.")
+}
+
+fn create_proof_reader(
+    processor: &Processor,
+    scaffold: &Path,
+) -> Result<ProofReader<File, ProofLiterals>, anyhow::Error> {
+    let lits_file_path = scaffold.with_extension("lits");
+
+    let lits_file = File::open(&lits_file_path)
+        .with_context(|| format!("Failed to open {}", lits_file_path.display()))?;
+
+    #[allow(
+        clippy::needless_borrows_for_generic_args,
+        reason = "the suggested fix does not compile"
+    )]
+    let proof_file =
+        File::open(&scaffold).with_context(|| format!("Failed to open {}", scaffold.display()))?;
+
+    let definitions = LiteralDefinitions::<String>::parse(lits_file).with_context(|| {
+        format!(
+            "Failed to parse literal definition from {}",
+            lits_file_path.display()
+        )
+    })?;
+    let proof = ProofReader::new(proof_file, processor.initialise_proof_literals(definitions));
+    Ok(proof)
 }

@@ -63,7 +63,7 @@ fn valid_rhs_bound_if_index_is_constrained() {
     test_element_checker(
         vec![
             atomic("index", GreaterThanEqual, 2),
-            atomic("index", LessThanEqual, 5),
+            atomic("index", LessThanEqual, 3),
             atomic("array_2", LessThanEqual, 5),
             atomic("array_3", LessThanEqual, 5),
         ],

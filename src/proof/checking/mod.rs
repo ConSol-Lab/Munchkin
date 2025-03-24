@@ -12,8 +12,6 @@ use drcp_format::LiteralDefinitions;
 use state::CheckingContext;
 use state::CheckingState;
 
-use crate::model::Model;
-
 pub(crate) mod combine;
 pub(crate) mod conclusion;
 pub(crate) mod inferences;
@@ -26,7 +24,7 @@ pub(crate) type Atomic = IntAtomicConstraint<String>;
 /// [`anyhow::Result`] is returned.
 #[allow(unused_variables, reason = "will be used in assignment")]
 pub(crate) fn verify_proof<R>(
-    model: Model,
+    state: CheckingState,
     proof: ProofReader<R, LiteralDefinitions<String>>,
 ) -> anyhow::Result<()>
 where
@@ -44,8 +42,6 @@ where
     // - When a fact is successfully checked, use `CheckingState::record_{nogood|inference}()` to
     //   save it to the state. This way they can be used in the combine step through
     //   `CheckingState::propagate_step()`.
-
-    let state = CheckingState::from(model);
 
     todo!()
 }
