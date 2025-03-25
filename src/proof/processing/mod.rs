@@ -105,3 +105,74 @@ fn introduce_inferences<W: Write>(
 
     todo!("implement introduction of inferences");
 }
+
+
+#[cfg(test)]
+mod test {
+    use drcp_format::LiteralDefinitions;
+
+    use crate::model::{Constraint, Model};
+
+    use super::*;
+
+    #[test]
+    fn test_trim() {
+        let mut model = Model::default();
+
+        let x = model.new_interval_variable("x", 0, 1);
+        let y = model.new_interval_variable("y", 0, 2);
+        let z = model.new_interval_variable("z", 0, 1);
+
+        // c1
+        model.add_constraint(Constraint::LinearLessEqual { terms: vec![x.scaled(-2), y.scaled(-1), z.scaled(-2)], rhs: -2 });
+        // c2
+        model.add_constraint(Constraint::LinearLessEqual { terms: vec![x.scaled(-2), y.scaled(-1), z.scaled(2)], rhs: 0 });
+        // c3
+        model.add_constraint(Constraint::LinearLessEqual { terms: vec![x.scaled(-2), y.scaled(1), z.scaled(-2)], rhs: 0 });
+        // c4
+        model.add_constraint(Constraint::LinearLessEqual { terms: vec![x.scaled(-2), y.scaled(1), z.scaled(2)], rhs: 2 });
+        // c5
+        model.add_constraint(Constraint::LinearLessEqual { terms: vec![x.scaled(2), y.scaled(-1), z.scaled(-2)], rhs: -2 });
+        // c6
+        model.add_constraint(Constraint::LinearLessEqual { terms: vec![x.scaled(2), y.scaled(-1), z.scaled(2)], rhs: 0 });
+
+        let mut processor = Processor::from(model);
+
+        let literals = r#"
+        1 [x >= 1]
+        2 [y >= 2]
+        3 [y >= 1]
+        4 [z >= 1]
+        "#;
+
+        let definitions = LiteralDefinitions::<String>::parse(literals.as_bytes()).unwrap();
+
+        println!("{definitions:?}");
+
+
+        let scaffold = r#"
+        n 1 -1 2
+        n 2 -3 4
+        n 3 -1 -2
+        n 4 -1
+        c UNSAT
+        "#;
+
+        let proof = ProofReader::new(scaffold.as_bytes(), processor.initialise_proof_literals(definitions));
+
+        let (nogoods, conclusion) = trim(&mut processor, proof).unwrap();
+
+        assert!(matches!(conclusion, Conclusion::<Literal>::Unsatisfiable));
+
+        assert_eq!(nogoods.len(), 3);
+        let nogood_0 = &nogoods[0];
+        assert_eq!(nogood_0.len(), 2);
+        assert!(nogood_0.contains(&Literal::u32_to_literal(7)));
+        assert!(nogood_0.contains(&Literal::u32_to_literal(2)));
+        let nogood_1 = &nogoods[1];
+        assert!(nogood_1.contains(&Literal::u32_to_literal(6)));
+        assert!(nogood_1.contains(&Literal::u32_to_literal(2)));
+        let nogood_2 = &nogoods[2];
+        assert!(nogood_2.contains(&Literal::u32_to_literal(2)));
+    }
+}
