@@ -1,25 +1,30 @@
+use std::num::NonZero;
+
 use crate::branching::Brancher;
+use crate::constraints;
+use crate::munchkin_assert_simple;
 use crate::optimisation::OptimisationProcedure;
 use crate::results::OptimisationResult;
 use crate::results::SolutionReference;
 use crate::solver::OptimisationDirection;
 use crate::termination::TerminationCondition;
-use crate::variables::IntegerVariable;
+use crate::variables::DomainId;
+use crate::variables::TransformableVariable;
 use crate::Solver;
 
 /// Implements the core-guided search optimisation procedure.
 #[derive(Debug, Clone)]
 #[allow(unused, reason = "Will be used in the assignments")]
-pub(crate) struct Oll<Var, Callback> {
+pub(crate) struct Oll<Callback> {
     direction: OptimisationDirection,
     /// The linear objective function which is being optimised
-    objective_function: Vec<Var>,
+    objective_function: Vec<DomainId>,
     /// The single objective variable which is optimised
-    objective: Var,
+    objective: DomainId,
     solution_callback: Callback,
 }
 
-impl<Var, Callback> Oll<Var, Callback>
+impl<Callback> Oll<Callback>
 where
     // The trait bound here is not common; see
     // linear_unsat_sat for more info.
@@ -29,8 +34,8 @@ where
     /// Create a new instance of [`LinearSatUnsat`].
     pub(crate) fn new(
         direction: OptimisationDirection,
-        objective_function: Vec<Var>,
-        objective: Var,
+        objective_function: Vec<DomainId>,
+        objective: DomainId,
         solution_callback: Callback,
     ) -> Self {
         Self {
@@ -40,11 +45,33 @@ where
             solution_callback,
         }
     }
+
+    /// Adds a constraint to the solver that `\sum variables <= new_var`
+    #[allow(unused, reason = "Will be used in the assignments")]
+    pub(crate) fn create_linear_inequality(
+        solver: &mut Solver,
+        variables: &[DomainId],
+        new_var: DomainId,
+    ) {
+        let result = solver
+            .add_constraint(constraints::less_than_or_equals(
+                variables
+                    .iter()
+                    .map(|&var| var.scaled(1))
+                    .chain(std::iter::once(new_var.scaled(-1)))
+                    .collect::<Vec<_>>(),
+                0,
+            ))
+            .post(NonZero::new(1).unwrap());
+        munchkin_assert_simple!(
+            result.is_ok(),
+            "Adding new constraint over objective variables should not result in error"
+        );
+    }
 }
 
-impl<Var, Callback> OptimisationProcedure<Callback> for Oll<Var, Callback>
+impl<Callback> OptimisationProcedure<Callback> for Oll<Callback>
 where
-    Var: IntegerVariable,
     Callback: Fn(&Solver, SolutionReference),
 {
     fn optimise(
@@ -75,6 +102,9 @@ where
         // - [`Solver::default`] allows you to create a default solver with no constraints.
         // - [`Solver::new_variable_for_predicate`] creates a 0-1 integer variable corresponding to
         //   a predicate such that it can be used in linear sums.
+        //
+        // To create a constraint of the form `\sum x <= d` where `d` is a varaible, you can use the
+        // function [`Self::create_linear_inequality`].
         //
         // We recommend calling [`Self::update_best_solution_and_process`] when you find a
         // solution.

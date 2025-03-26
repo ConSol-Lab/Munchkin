@@ -10,6 +10,7 @@ use crate::constraints::SubCircuitElimination;
 use crate::encodings;
 use crate::engine::cp::AssignmentsInteger;
 use crate::options::SolverOptions;
+use crate::predicate;
 use crate::termination::TerminationCondition;
 use crate::variables::AffineView;
 use crate::variables::DomainId;
@@ -111,10 +112,7 @@ impl Model {
             .variables
             .iter()
             .map(|(name, lower_bound, upper_bound)| {
-                (
-                    AffineView::from(assignment.grow(*lower_bound, *upper_bound)),
-                    name.clone(),
-                )
+                (assignment.grow(*lower_bound, *upper_bound), name.clone())
             })
             .unzip();
 
@@ -143,11 +141,7 @@ impl Model {
             .into_iter()
             .map(|(name, lower_bound, upper_bound)| {
                 (
-                    AffineView::from(solver.new_named_bounded_integer(
-                        lower_bound,
-                        upper_bound,
-                        name.clone(),
-                    )),
+                    solver.new_named_bounded_integer(lower_bound, upper_bound, name.clone()),
                     name,
                 )
             })
@@ -432,7 +426,7 @@ pub enum Output {
 
 #[derive(Clone, Debug)]
 pub struct VariableMap {
-    variables: Vec<AffineView<DomainId>>,
+    variables: Vec<DomainId>,
     names: Vec<String>,
     arrays: Vec<(String, Range<usize>)>,
     two_dimensional_arrays: Vec<(String, (Range<usize>, usize))>,
@@ -443,13 +437,32 @@ impl VariableMap {
         self.names
             .iter()
             .position(|n| n == name)
-            .map(|index| self.variables[index].clone())
+            .map(|index| self.variables[index].clone().scaled(1))
     }
 
     pub fn to_solver_variable(&self, int_var: IntVariable) -> AffineView<DomainId> {
         self.variables[int_var.id]
             .scaled(int_var.scale)
             .offset(int_var.offset)
+    }
+
+    pub fn variable_to_domain_id(&mut self, solver: &mut Solver, int_var: IntVariable) -> DomainId {
+        let variable = self.variables[int_var.id];
+        if int_var.scale == 1 && int_var.offset == 0 {
+            variable
+        } else {
+            if solver.lower_bound(&variable) >= 0 && solver.upper_bound(&variable) <= 1 {
+                let transformed = variable.scaled(int_var.scale).offset(int_var.offset);
+                let new_variable = solver.new_variable_for_predicate(predicate!(transformed <= 0));
+                new_variable
+            } else {
+                panic!(
+                    "Not yet supported for variable with int_var bounds {}, {}",
+                    solver.lower_bound(&variable),
+                    solver.upper_bound(&variable)
+                );
+            }
+        }
     }
 
     pub fn to_solver_variables<'this, I>(
@@ -494,7 +507,7 @@ impl VariableMap {
         let (_, range) = &self.arrays[array.0];
 
         (range.start..range.end)
-            .map(|idx| self.variables[idx].clone())
+            .map(|idx| self.variables[idx].clone().scaled(1))
             .collect()
     }
 
@@ -507,7 +520,12 @@ impl VariableMap {
             .map(|id| self.variables[id].clone())
             .collect::<Vec<_>>()
             .chunks(*num_columns)
-            .map(|chunk| chunk.to_vec())
+            .map(|chunk| {
+                chunk
+                    .into_iter()
+                    .map(|var| var.scaled(1))
+                    .collect::<Vec<_>>()
+            })
             .collect::<Vec<_>>()
     }
 }

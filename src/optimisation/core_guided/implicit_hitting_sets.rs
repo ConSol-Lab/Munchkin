@@ -20,16 +20,16 @@ use crate::Solver;
 /// Implements the core-guided search optimisation procedure.
 #[derive(Debug, Clone)]
 #[allow(unused, reason = "Will be used in the assignments")]
-pub(crate) struct ImplicitHittingSets<Var, Callback> {
+pub(crate) struct ImplicitHittingSets<Callback> {
     direction: OptimisationDirection,
     /// The linear objective function which is being optimised
-    objective_function: Vec<Var>,
+    objective_function: Vec<DomainId>,
     /// The single objective variable which is optimised
-    objective: Var,
+    objective: DomainId,
     solution_callback: Callback,
 }
 
-impl<Var, Callback> ImplicitHittingSets<Var, Callback>
+impl<Callback> ImplicitHittingSets<Callback>
 where
     // The trait bound here is not common; see
     // linear_unsat_sat for more info.
@@ -39,8 +39,8 @@ where
     /// Create a new instance of [`LinearSatUnsat`].
     pub(crate) fn new(
         direction: OptimisationDirection,
-        objective_function: Vec<Var>,
-        objective: Var,
+        objective_function: Vec<DomainId>,
+        objective: DomainId,
         solution_callback: Callback,
     ) -> Self {
         Self {
@@ -58,7 +58,11 @@ where
     /// Given the provided [`VariableSelector`] and [`ValueSelector`]; it creates a new
     /// [`Brancher`].
     #[allow(unused, reason = "Will be used in the assignments")]
-    fn create_search<VarSelection: VariableSelector<Var>, ValSelection: ValueSelector<Var>>(
+    fn create_search<
+        Var: IntegerVariable,
+        VarSelection: VariableSelector<Var>,
+        ValSelection: ValueSelector<Var>,
+    >(
         variable_selection: VarSelection,
         value_selection: ValSelection,
     ) -> impl Brancher {
@@ -117,9 +121,8 @@ where
     }
 }
 
-impl<Var, Callback> OptimisationProcedure<Callback> for ImplicitHittingSets<Var, Callback>
+impl<Callback> OptimisationProcedure<Callback> for ImplicitHittingSets<Callback>
 where
-    Var: IntegerVariable,
     Callback: Fn(&Solver, SolutionReference),
 {
     fn optimise(

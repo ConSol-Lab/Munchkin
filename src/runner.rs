@@ -232,7 +232,7 @@ pub fn solve<SearchStrategies>(
         })
         .transpose()?;
 
-    let (mut solver, solver_variables) = model.into_solver(
+    let (mut solver, mut solver_variables) = model.into_solver(
         SolverOptions {
             conflict_resolver: conflict_resolution,
             minimisation_strategy: minimisation,
@@ -268,21 +268,29 @@ pub fn solve<SearchStrategies>(
     let objective_variable = solver_variables.to_solver_variable(instance.objective());
 
     let result = match optimisation_strategy {
-        OptimisationStrategy::LinearSatUnsat => solver.optimise(
-            &mut brancher,
-            &mut time_budget,
-            LinearSatUnsat::new(Minimise, objective_variable.clone(), solution_callback),
-        ),
-        OptimisationStrategy::LinearUnsatSat => solver.optimise(
-            &mut brancher,
-            &mut time_budget,
-            LinearUnsatSat::new(Minimise, objective_variable.clone(), solution_callback),
-        ),
+        OptimisationStrategy::LinearSatUnsat => {
+            let objective_variable = solver_variables.to_solver_variable(instance.objective());
+            solver.optimise(
+                &mut brancher,
+                &mut time_budget,
+                LinearSatUnsat::new(Minimise, objective_variable.clone(), solution_callback),
+            )
+        }
+        OptimisationStrategy::LinearUnsatSat => {
+            let objective_variable = solver_variables.to_solver_variable(instance.objective());
+            solver.optimise(
+                &mut brancher,
+                &mut time_budget,
+                LinearUnsatSat::new(Minimise, objective_variable.clone(), solution_callback),
+            )
+        }
         OptimisationStrategy::OLL => {
+            let objective_variable =
+                solver_variables.variable_to_domain_id(&mut solver, instance.objective());
             let objective_function = instance
                 .objective_function()
                 .into_iter()
-                .map(|var| solver_variables.to_solver_variable(var))
+                .map(|var| solver_variables.variable_to_domain_id(&mut solver, var))
                 .collect::<Vec<_>>();
             solver.optimise(
                 &mut brancher,
@@ -296,10 +304,12 @@ pub fn solve<SearchStrategies>(
             )
         }
         OptimisationStrategy::IHS => {
+            let objective_variable =
+                solver_variables.variable_to_domain_id(&mut solver, instance.objective());
             let objective_function = instance
                 .objective_function()
                 .into_iter()
-                .map(|var| solver_variables.to_solver_variable(var))
+                .map(|var| solver_variables.variable_to_domain_id(&mut solver, var))
                 .collect::<Vec<_>>();
             solver.optimise(
                 &mut brancher,
