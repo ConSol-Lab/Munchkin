@@ -1735,7 +1735,6 @@ impl CSPSolverState {
     }
 
     pub(crate) fn declare_solving(&mut self) {
-        munchkin_assert_simple!((self.is_ready() || self.conflicting()) && !self.is_infeasible());
         self.internal_state = CSPSolverStateInternal::Solving;
     }
 

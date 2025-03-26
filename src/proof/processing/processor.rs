@@ -67,7 +67,10 @@ impl Processor {
         let handle = self
             .engine
             .add_rp_clause(nogood.literals.into_iter().map(|lit| !lit))
-            .map_err(|reasons| self.map_reasons(reasons))?;
+            .map_err(|(handle, reasons)| {
+                let _ = self.handles.insert(handle, nogood.id);
+                self.map_reasons(reasons)
+            })?;
 
         let _ = self.handles.insert(handle, nogood.id);
 

@@ -93,7 +93,7 @@ impl RpEngine {
     pub(crate) fn add_rp_clause(
         &mut self,
         clause: impl IntoIterator<Item = Literal>,
-    ) -> Result<RpClauseHandle, ReversePropagationConflict> {
+    ) -> Result<RpClauseHandle, (RpClauseHandle, ReversePropagationConflict)> {
         let clause: Vec<Literal> = clause.into_iter().collect();
         assert!(!clause.is_empty(), "cannot add the empty clause");
 
@@ -105,7 +105,8 @@ impl RpEngine {
             let _ = self.rp_unit_clauses.insert(clause[0], new_handle);
 
             self.solver.declare_new_decision_level();
-            self.enqueue_and_propagate(clause[0])?;
+            self.enqueue_and_propagate(clause[0])
+                .map_err(|e| (new_handle, e))?;
         } else {
             let propagating_literal = self.get_propagating_literal(&clause);
 
@@ -117,7 +118,8 @@ impl RpEngine {
             self.rp_clauses.push(RpClause::ClauseRef(reference));
 
             if let Some(propagating_literal) = propagating_literal {
-                self.enqueue_and_propagate(propagating_literal)?;
+                self.enqueue_and_propagate(propagating_literal)
+                    .map_err(|e| (new_handle, e))?;
             }
         }
 
@@ -210,6 +212,7 @@ impl RpEngine {
     fn backtrack_one_level(&mut self) {
         self.solver
             .backtrack(self.solver.get_decision_level() - 1, &mut DummyBrancher);
+        self.solver.state.declare_solving();
     }
 
     fn enqueue_and_propagate(
@@ -553,7 +556,7 @@ mod tests {
         let mut checker = RpEngine::new(solver);
         let _ = checker.add_rp_clause(proof_c1);
 
-        let Err(conflict) = checker.add_rp_clause(proof_c2) else {
+        let Err((_, conflict)) = checker.add_rp_clause(proof_c2) else {
             panic!("expected propagation to detect conflict")
         };
 
