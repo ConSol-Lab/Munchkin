@@ -1625,7 +1625,10 @@ impl Counters {
             self.average_number_of_literals_removed_minimisation.value(),
         );
 
-        log_statistic("averageCoreSizeBeforeMinimisation", self.average_core_size.value());
+        log_statistic(
+            "averageCoreSizeBeforeMinimisation",
+            self.average_core_size.value(),
+        );
         log_statistic(
             "averageNumberOfElementsRemovedCoreMinimisation",
             self.average_number_of_elements_removed_by_core_minimisation

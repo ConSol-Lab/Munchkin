@@ -105,14 +105,13 @@ fn introduce_inferences<W: Write>(
     todo!("implement introduction of inferences");
 }
 
-
 #[cfg(test)]
 mod test {
     use drcp_format::LiteralDefinitions;
 
-    use crate::model::{Constraint, Model};
-
     use super::*;
+    use crate::model::Constraint;
+    use crate::model::Model;
 
     #[test]
     fn test_trim() {
@@ -123,17 +122,35 @@ mod test {
         let z = model.new_interval_variable("z", 0, 1);
 
         // c1
-        model.add_constraint(Constraint::LinearLessEqual { terms: vec![x.scaled(-2), y.scaled(-1), z.scaled(-2)], rhs: -2 });
+        model.add_constraint(Constraint::LinearLessEqual {
+            terms: vec![x.scaled(-2), y.scaled(-1), z.scaled(-2)],
+            rhs: -2,
+        });
         // c2
-        model.add_constraint(Constraint::LinearLessEqual { terms: vec![x.scaled(-2), y.scaled(-1), z.scaled(2)], rhs: 0 });
+        model.add_constraint(Constraint::LinearLessEqual {
+            terms: vec![x.scaled(-2), y.scaled(-1), z.scaled(2)],
+            rhs: 0,
+        });
         // c3
-        model.add_constraint(Constraint::LinearLessEqual { terms: vec![x.scaled(-2), y.scaled(1), z.scaled(-2)], rhs: 0 });
+        model.add_constraint(Constraint::LinearLessEqual {
+            terms: vec![x.scaled(-2), y.scaled(1), z.scaled(-2)],
+            rhs: 0,
+        });
         // c4
-        model.add_constraint(Constraint::LinearLessEqual { terms: vec![x.scaled(-2), y.scaled(1), z.scaled(2)], rhs: 2 });
+        model.add_constraint(Constraint::LinearLessEqual {
+            terms: vec![x.scaled(-2), y.scaled(1), z.scaled(2)],
+            rhs: 2,
+        });
         // c5
-        model.add_constraint(Constraint::LinearLessEqual { terms: vec![x.scaled(2), y.scaled(-1), z.scaled(-2)], rhs: -2 });
+        model.add_constraint(Constraint::LinearLessEqual {
+            terms: vec![x.scaled(2), y.scaled(-1), z.scaled(-2)],
+            rhs: -2,
+        });
         // c6
-        model.add_constraint(Constraint::LinearLessEqual { terms: vec![x.scaled(2), y.scaled(-1), z.scaled(2)], rhs: 0 });
+        model.add_constraint(Constraint::LinearLessEqual {
+            terms: vec![x.scaled(2), y.scaled(-1), z.scaled(2)],
+            rhs: 0,
+        });
 
         let mut processor = Processor::from(model);
 
@@ -148,7 +165,6 @@ mod test {
 
         println!("{definitions:?}");
 
-
         let scaffold = r#"
         n 1 -1 2
         n 2 -3 4
@@ -157,7 +173,10 @@ mod test {
         c UNSAT
         "#;
 
-        let proof = ProofReader::new(scaffold.as_bytes(), processor.initialise_proof_literals(definitions));
+        let proof = ProofReader::new(
+            scaffold.as_bytes(),
+            processor.initialise_proof_literals(definitions),
+        );
 
         let (nogoods, conclusion) = trim(&mut processor, proof).unwrap();
 
