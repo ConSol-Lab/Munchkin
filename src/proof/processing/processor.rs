@@ -74,7 +74,7 @@ impl Processor {
 
         let _ = self.handles.insert(handle, nogood.id);
 
-        self.propagate_under_assumptions(self.bound)?;
+        self.propagate_under_assumptions([])?;
 
         Ok(())
     }

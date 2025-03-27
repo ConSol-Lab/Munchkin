@@ -228,7 +228,7 @@ fn inference_step(input: &str) -> IResult<&str, Inference<'_, Vec<NonZero<i32>>,
             step_id,
             tag(" "),
             literal_list,
-            opt(preceded(tag(" 0 "), literal)),
+            opt(preceded(alt((tag(" 0 "), tag("0 "))), literal)),
             opt(preceded(tag(" c:"), constraint_id)),
             opt(preceded(tag(" l:"), identifier)),
         )),
@@ -383,5 +383,21 @@ mod tests {
             hints: None,
         };
         assert_eq!(Some(Step::Nogood(expected_nogood)), nogood_step);
+    }
+
+    #[test]
+    fn failing_inference() {
+        let source = "i 7 0 -18 c:1 l:prevent_and_check\n";
+        let mut reader = ProofReader::new(source.as_bytes(), std::convert::identity);
+
+        let inference_step = reader.next_step().expect("valid drcp nogood step");
+        let expected_inference = Inference {
+            id: NonZero::new(7).unwrap(),
+            hint_constraint_id: Some(NonZero::new(1).unwrap()),
+            hint_label: Some("prevent_and_check"),
+            premises: vec![],
+            propagated: Some(NonZero::new(-18).unwrap()),
+        };
+        assert_eq!(Some(Step::Inference(expected_inference)), inference_step);
     }
 }
