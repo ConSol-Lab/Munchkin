@@ -1508,7 +1508,7 @@ impl ConstraintSatisfactionSolver {
                         .try_into()
                         .expect("Expected only integer predicates to be provided");
                     self.variable_literal_mappings.get_literal(
-                        integer_predicate,
+                        !integer_predicate,
                         &self.assignments_propositional,
                         &self.assignments_integer,
                     )
