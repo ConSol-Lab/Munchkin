@@ -450,18 +450,15 @@ impl VariableMap {
         let variable = self.variables[int_var.id];
         if int_var.scale == 1 && int_var.offset == 0 {
             variable
+        } else if solver.lower_bound(&variable) >= 0 && solver.upper_bound(&variable) <= 1 {
+            let transformed = variable.scaled(int_var.scale).offset(int_var.offset);
+            solver.new_variable_for_predicate(predicate!(transformed <= 0))
         } else {
-            if solver.lower_bound(&variable) >= 0 && solver.upper_bound(&variable) <= 1 {
-                let transformed = variable.scaled(int_var.scale).offset(int_var.offset);
-                let new_variable = solver.new_variable_for_predicate(predicate!(transformed <= 0));
-                new_variable
-            } else {
-                panic!(
-                    "Not yet supported for variable with int_var bounds {}, {}",
-                    solver.lower_bound(&variable),
-                    solver.upper_bound(&variable)
-                );
-            }
+            panic!(
+                "Not yet supported for variable with int_var bounds {}, {}",
+                solver.lower_bound(&variable),
+                solver.upper_bound(&variable)
+            );
         }
     }
 
@@ -517,15 +514,10 @@ impl VariableMap {
     ) -> Vec<Vec<AffineView<DomainId>>> {
         let (_, (range, num_columns)) = &self.two_dimensional_arrays[array.0];
         (range.start..range.end)
-            .map(|id| self.variables[id].clone())
+            .map(|id| self.variables[id])
             .collect::<Vec<_>>()
             .chunks(*num_columns)
-            .map(|chunk| {
-                chunk
-                    .into_iter()
-                    .map(|var| var.scaled(1))
-                    .collect::<Vec<_>>()
-            })
+            .map(|chunk| chunk.iter().map(|var| var.scaled(1)).collect::<Vec<_>>())
             .collect::<Vec<_>>()
     }
 }

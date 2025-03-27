@@ -57,6 +57,7 @@ fn simple_optimisation_problem() {
         vec![x, y, z, a],
         o,
         empty_callback,
+        false,
     );
     let result = ihs.optimise(
         &mut IndependentVariableValueBrancher::new(

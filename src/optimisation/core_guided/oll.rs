@@ -22,6 +22,8 @@ pub(crate) struct Oll<Callback> {
     /// The single objective variable which is optimised
     objective: DomainId,
     solution_callback: Callback,
+    /// Whether to use core minimisation
+    use_core_minimisation: bool,
 }
 
 impl<Callback> Oll<Callback>
@@ -37,12 +39,14 @@ where
         objective_function: Vec<DomainId>,
         objective: DomainId,
         solution_callback: Callback,
+        use_core_minimisation: bool,
     ) -> Self {
         Self {
             direction,
             objective_function,
             objective,
             solution_callback,
+            use_core_minimisation,
         }
     }
 
@@ -104,6 +108,10 @@ where
         //
         // We recommend calling [`Self::update_best_solution_and_process`] when you find a
         // solution.
+        //
+        // The variable `self.use_core_minimisation` indicates whether or not the optimisation
+        // procedure should use core minimisation. Core minimisation can be called using
+        // [`CoreMinimiser::minimise_core`].
         todo!()
     }
 

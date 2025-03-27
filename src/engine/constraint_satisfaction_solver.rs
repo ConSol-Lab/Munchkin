@@ -824,6 +824,7 @@ impl ConstraintSatisfactionSolver {
                 }
             } else {
                 // Conflict has occured
+                termination.encountered_conflict();
 
                 if self.assignments_propositional.is_at_the_root_level() {
                     // If it is at the root level then the problem is infeasible

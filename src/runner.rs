@@ -96,9 +96,14 @@ pub enum Action<SearchStrategies: OptionEnum> {
         /// Whether to use a non-trivial propagation explanation
         #[arg(short = 'R', long = "non-trivial-propagation")]
         use_non_trivial_propagation_explanation: bool,
+
         /// The optimisation strategy which is used by the solver
         #[arg(short = 'O', long = "optimisation", default_value_t)]
         optimisation_strategy: OptimisationStrategy,
+
+        /// Whether to use core minimisation
+        #[arg(short = 'I', long = "use-core-minimisation")]
+        use_core_minimisation: bool,
 
         /// The number of seconds the solver is allowed to run.
         time_out: u64,
@@ -185,6 +190,7 @@ where
             time_out,
             use_non_trivial_conflict_explanation: use_non_generic_conflict_explanation,
             use_non_trivial_propagation_explanation: use_non_generic_propagation_explanation,
+            use_core_minimisation,
         } => solve(
             model,
             instance,
@@ -198,6 +204,7 @@ where
             use_non_generic_propagation_explanation,
             proof_path,
             Duration::from_secs(time_out),
+            use_core_minimisation,
         ),
         Action::Processing {
             scaffold,
@@ -221,6 +228,7 @@ pub fn solve<SearchStrategies>(
     use_non_generic_propagation_explanation: bool,
     proof_path: Option<PathBuf>,
     time_out: Duration,
+    use_core_minimisation: bool,
 ) -> anyhow::Result<()> {
     let mut time_budget = TimeBudget::starting_now(time_out);
     let proof = proof_path
@@ -298,8 +306,9 @@ pub fn solve<SearchStrategies>(
                 Oll::new(
                     Minimise,
                     objective_function,
-                    objective_variable.clone(),
+                    objective_variable,
                     solution_callback,
+                    use_core_minimisation,
                 ),
             )
         }
@@ -317,8 +326,9 @@ pub fn solve<SearchStrategies>(
                 ImplicitHittingSets::new(
                     Minimise,
                     objective_function,
-                    objective_variable.clone(),
+                    objective_variable,
                     solution_callback,
+                    use_core_minimisation,
                 ),
             )
         }
