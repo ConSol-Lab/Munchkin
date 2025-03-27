@@ -94,7 +94,7 @@ where
         // - [`Solver::satisfy_under_assumptions`] to solve given a list of assumptions
         //   - The result of this method (a
         //     [`SatisfactionResultUnderAssumptions::UnsatisfiableUnderAssumptions`]) contains a
-        //     method [`extract_core`] which allows the extraction of a core in terms of literals
+        //     method [`extract_core`] which allows the extraction of a core in terms of predicates
         // - [`Solver::add_constraint`] allows you to add additional constraints; for example, if
         //   you want to add a the constraint that the sum of a set of variables `x` should be less
         //   than or equal to `c` then you can do this using

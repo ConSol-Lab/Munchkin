@@ -344,7 +344,7 @@ pub fn solve<SearchStrategies>(
             println!("==========");
             solver.log_statistics()
         }
-        OptimisationResult::Satisfiable(_) => {}
+        OptimisationResult::Satisfiable(_) => solver.log_statistics(),
 
         OptimisationResult::Unsatisfiable => {
             solver.log_statistics();
