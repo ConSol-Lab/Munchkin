@@ -135,6 +135,12 @@ impl Solver {
     pub(crate) fn into_satisfaction_solver(self) -> ConstraintSatisfactionSolver {
         self.satisfaction_solver
     }
+
+    pub(crate) fn create_empty_clone(&self) -> Self {
+        Self {
+            satisfaction_solver: self.satisfaction_solver.create_empty_clone(),
+        }
+    }
 }
 
 /// Methods to retrieve information about variables
@@ -522,6 +528,18 @@ impl Solver {
         clause: impl IntoIterator<Item = Literal>,
     ) -> Result<(), ConstraintOperationError> {
         self.satisfaction_solver.add_clause(clause)
+    }
+
+    /// Creates a nogood from `predicates` and adds it to the current formula.
+    ///
+    /// If the formula becomes trivially unsatisfiable, a [`ConstraintOperationError`] will be
+    /// returned. Subsequent calls to this method will always return an error, and no
+    /// modification of the solver will take place.
+    pub fn add_nogood(
+        &mut self,
+        predicates: impl IntoIterator<Item = Predicate>,
+    ) -> Result<(), ConstraintOperationError> {
+        self.satisfaction_solver.add_nogood(predicates)
     }
 
     /// Post a new propagator to the solver. If unsatisfiability can be immediately determined

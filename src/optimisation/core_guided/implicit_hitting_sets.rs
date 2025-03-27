@@ -75,7 +75,7 @@ where
     /// Side note: this function will add an additional constraint to the solver which should not
     /// impact the feasibility of the solver!
     #[allow(unused, reason = "Will be used in the assignments")]
-    fn create_optimisation_procedure_for_mhs(
+    fn create_optimisation_procedure(
         solver: &mut Solver,
         objective_variables: &[DomainId],
     ) -> LinearUnsatSat<DomainId, impl Fn(&Solver, SolutionReference<'_>)> {
@@ -129,7 +129,7 @@ where
         &mut self,
         _brancher: &mut impl Brancher,
         _termination: &mut impl TerminationCondition,
-        _solver: &mut Solver,
+        solver: &mut Solver,
     ) -> OptimisationResult {
         // In this method you should optimise `self.objective` according to the provided
         // `self.direction` using the Implicit Hitting Sets core-guided search approach.
@@ -143,35 +143,40 @@ where
         //     [`SatisfactionResultUnderAssumptions::UnsatisfiableUnderAssumptions`]) contains a
         //     method [`extract_core`] which allows the extraction of a core in terms of literals
         // - [`Solver::get_predicates`] which allows you to find the predicates linked to a literal.
-        // - [`Solver::add_clause`] to introduce a new constraint in the form of predicates
         // - [`Solver::add_constraint`] allows you to add additional constraints; for example, if
         //   you want to add a the constraint that the sum of a set of variables `x` should be less
         //   than or equal to `c` then you can do this using
         //   `solver.add_constraint(constraints::less_than_or_equals(x,
         //   c)).post(NonZero::new(1).unwrap())`
         // - [`Solver::new_bounded_integer`] allows you to create a new integer variable
-        // - [`Solver::new_variable_for_predicate`] creates a 0-1 integer variable corresponding to
-        //   a predicate such that it can be used in linear sums.
         //
-        // You will need to create a new solver for calculating the minimum hitting set; a new
-        // solver can be created using [`Solver::default`] (or [`Solver::with_options`] if you would
-        // like to provide different solver options). You can then optimise using the
-        // function [`Solver::optimise`] which takes three inputs:
+        // As the main solver you can make use of the `main_solver` defined below which has been
+        // created to contain no constraints and the same variables as the `solver` provided to this
+        // method. You can add nogoods using the method [`Solver::add_nogood`].
+        //
+        // You can then optimise using the function [`Solver::optimise`] which takes
+        // three inputs:
         // 1. A [`Brancher`] which you should create using [`Self::create_search`] which you would
         //    provide with a variable and value selector. For example, if you have a list of
         //    variables `x` then you would use the function as follows:
-        //    `Self::create_search(InputOrder::new(x), InDomainMin)`.
-        //
-        //    Do **not** pass it the same brancher as provided to this method since it searches
-        //    over different variables than you'll be creating for finding the minimum hitting set.
+        //    `Self::create_search(InputOrder::new(x), InDomainMin)`. You should be able to provide
+        //    it with the same `brancher` passed to this method.
         // 2. A [`TerminationCondition`] - Use the same [`TerminationCondition`] as passed to this
         //    method.
         // 3. An [`OptimisationProcedure`] - You can use the function
-        //    [`Self::create_optimisation_procedure_for_mhs`] which minimises the sum of a set of
-        //    integer variables using the Linear UNSAT-SAT approach
+        //    [`Self::create_optimisation_procedure`] which minimises the sum of a set of integer
+        //    variables using the Linear UNSAT-SAT approach
         //
         // We recommend calling [`Self::update_best_solution_and_process`] when you find a
         // solution.
+
+        #[allow(
+            unused_variables,
+            unused_mut,
+            reason = "Will be used in the assignment"
+        )]
+        let mut main_solver = solver.create_empty_clone();
+
         todo!()
     }
 

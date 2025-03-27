@@ -91,19 +91,15 @@ where
         //   - The result of this method (a
         //     [`SatisfactionResultUnderAssumptions::UnsatisfiableUnderAssumptions`]) contains a
         //     method [`extract_core`] which allows the extraction of a core in terms of literals
-        // - [`Solver::get_predicates`] which allows you to find the predicates linked to a literal.
         // - [`Solver::add_constraint`] allows you to add additional constraints; for example, if
         //   you want to add a the constraint that the sum of a set of variables `x` should be less
         //   than or equal to `c` then you can do this using
         //   `solver.add_constraint(constraints::less_than_or_equals(x,
         //   c)).post(NonZero::new(1).unwrap())`
-        // - [`Solver::add_clause`] to introduce a new constraint in the form of predicates
-        // - [`Solver::new_bounded_integer`] allows you to create a new integer variable
-        // - [`Solver::default`] allows you to create a default solver with no constraints.
-        // - [`Solver::new_variable_for_predicate`] creates a 0-1 integer variable corresponding to
-        //   a predicate such that it can be used in linear sums.
+        // - [`Solver::new_bounded_integer`] allows you to create a new integer variable a predicate
+        //   such that it can be used in linear sums.
         //
-        // To create a constraint of the form `\sum x <= d` where `d` is a varaible, you can use the
+        // To create a constraint of the form `\sum x <= d` where `d` is a variable, you can use the
         // function [`Self::create_linear_inequality`].
         //
         // We recommend calling [`Self::update_best_solution_and_process`] when you find a

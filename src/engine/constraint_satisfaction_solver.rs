@@ -67,6 +67,7 @@ use crate::engine::DebugHelper;
 use crate::munchkin_assert_extreme;
 use crate::munchkin_assert_moderate;
 use crate::munchkin_assert_simple;
+use crate::predicates::IntegerPredicate;
 use crate::proof::Proof;
 use crate::termination::Indefinite;
 #[cfg(doc)]
@@ -385,6 +386,24 @@ impl ConstraintSatisfactionSolver {
 
 // methods that offer basic functionality
 impl ConstraintSatisfactionSolver {
+    pub fn create_empty_clone(&self) -> Self {
+        let mut new_s = Self::default();
+        for _ in self.assignments_propositional.get_propositional_variables() {
+            // Add all of the propositional variables
+            let _ = new_s.create_new_propositional_variable(None);
+        }
+
+        for domain_id in self.assignments_integer.get_domains() {
+            let _ = new_s.create_new_integer_variable(
+                self.assignments_integer.get_lower_bound(domain_id),
+                self.assignments_integer.get_upper_bound(domain_id),
+                None,
+            );
+        }
+
+        new_s
+    }
+
     pub fn new(solver_options: SatisfactionSolverOptions) -> Self {
         let dummy_literal = Literal::new(PropositionalVariable::new(0), true);
 
@@ -1474,6 +1493,27 @@ impl ConstraintSatisfactionSolver {
                 Err(ConstraintOperationError::InfeasiblePropagator)
             }
         }
+    }
+
+    pub fn add_nogood(
+        &mut self,
+        predicates: impl IntoIterator<Item = Predicate>,
+    ) -> Result<(), ConstraintOperationError> {
+        self.add_clause(
+            predicates
+                .into_iter()
+                .map(|predicate| {
+                    let integer_predicate: IntegerPredicate = predicate
+                        .try_into()
+                        .expect("Expected only integer predicates to be provided");
+                    self.variable_literal_mappings.get_literal(
+                        integer_predicate,
+                        &self.assignments_propositional,
+                        &self.assignments_integer,
+                    )
+                })
+                .collect::<Vec<_>>(),
+        )
     }
 
     /// Creates a clause from `literals` and adds it to the current formula.
