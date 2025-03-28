@@ -156,7 +156,7 @@ def check_run(run: Path, model: ModelType, optimal_values: dict) -> bool:
     wrong_solution = False
 
     if is_optimal(run): 
-        reported_optimal_value = next((int(line.removeprefix("%%  objective=")) for line in list(iter_solutions(run))[-1].splitlines() if line.startswith("%%  objective=")), None)
+        reported_optimal_value = next((int(line.removeprefix("%%  objective=")) for line in list(iter_solutions(run))[-1].splitlines() if line.startswith("%%  objective=")), next((int(line[:-1].removeprefix("Objective = ")) for line in list(iter_solutions(run))[-1].splitlines() if line.startswith("Objective")), None))
         if optimal_values[instance_name] != reported_optimal_value:
             wrong_optimality = True
             print(f"{bcolors.FAIL}Incorrect optimality recorded for {instance_name}; expected {optimal_values[instance_name]} but was {reported_optimal_value}\n{bcolors.ENDC}")
@@ -182,7 +182,7 @@ def run_minizinc(model_path: Path, data_path: Path, solutions: Path) -> bool:
 
     for instance in solutions.iterdir():
         solution_count += 1
-        mzn_command_args = ["minizinc", "--solver", "cp-sat", str(model_path), str(data_path), str(instance)]
+        mzn_command_args = ["minizinc", "--solver", "cp-sat", "-f", str(model_path), str(data_path), str(instance)]
         result = run(mzn_command_args, capture_output=True, text=True)
 
         if result.returncode != 0:

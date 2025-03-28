@@ -66,7 +66,7 @@ impl Problem<SearchStrategies> for ClusterEditing {
         }
 
         let cost = model.new_interval_variable(
-            "Cost",
+            "Objective",
             0,
             (num_nodes_usize * (num_nodes_usize - 1)) as i32,
         );
