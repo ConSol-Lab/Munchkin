@@ -87,6 +87,10 @@ where
         // In this method you should optimise `self.objective` according to the provided
         // `self.direction` using the OLL core-guided search approach.
         //
+        // IMPORTANT NOTE: Always ensure that you check the provided [`TerminationCondition`] using
+        // [`TerminationCondition::should_stop`] and return a [`OptimisationResult::Unknown`] if
+        // this method returns true.
+        //
         // To implement this method you can use the following methods:
         // - [`Solver::lower_bound`] and/or [`Solver::upper_bound`] to retrieve the lower-bound of a
         //   variable
