@@ -332,6 +332,13 @@ impl RpEngine {
     }
 
     fn initialise_explain_queue(&mut self, reasons: &mut Vec<ConflictReason>) -> Vec<Literal> {
+        if let Some(violated_assumption) = self.solver.state.get_violated_assumption() {
+            // In this case, one of the assumptions is directly contradicted by previous fixpoint
+            // propagation. In that case, we explain why the opposite of the violated assumption is
+            // true, to capture everything involved in the conflict.
+            return vec![!violated_assumption];
+        }
+
         let conflict_info = self.solver.state.get_conflict_info();
 
         match conflict_info {

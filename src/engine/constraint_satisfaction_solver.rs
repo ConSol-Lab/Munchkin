@@ -1733,22 +1733,17 @@ impl CSPSolverState {
         )
     }
 
-    #[allow(unused)]
-    pub(crate) fn get_violated_assumption(&self) -> Literal {
+    pub(crate) fn get_violated_assumption(&self) -> Option<Literal> {
         if let CSPSolverStateInternal::InfeasibleUnderAssumptions {
             violated_assumption,
         } = self.internal_state
         {
-            violated_assumption
+            Some(violated_assumption)
         } else {
-            panic!(
-                "Cannot extract violated assumption without getting the solver into the infeasible
-                 under assumptions state."
-            );
+            None
         }
     }
 
-    #[allow(unused)]
     pub(crate) fn get_conflict_info(&self) -> &StoredConflictInfo {
         if let CSPSolverStateInternal::Conflict { conflict_info } = &self.internal_state {
             conflict_info

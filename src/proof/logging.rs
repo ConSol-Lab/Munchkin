@@ -211,15 +211,8 @@ impl ProofLiterals {
         let mut definitions = LiteralDefinitions::default();
 
         for (variable, code) in entries {
-            let predicates = variable_literal_mapping
-                .get_predicates_for_literal(Literal::new(variable, true))
-                .map(|predicate| {
-                    if variable.get_index() == 0 {
-                        !predicate
-                    } else {
-                        predicate
-                    }
-                });
+            let predicates =
+                variable_literal_mapping.get_predicates_for_literal(Literal::new(variable, true));
 
             let atomics =
                 predicates.map(|predicate| integer_predicate_to_atomic(predicate, variable_names));
