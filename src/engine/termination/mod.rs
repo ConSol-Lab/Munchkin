@@ -11,7 +11,7 @@ pub(crate) mod time_budget;
 
 /// The central trait that defines a termination condition. A termination condition determines when
 /// the solver should give up searching for solutions.
-pub trait TerminationCondition {
+pub trait TerminationCondition: Clone {
     /// Returns `true` when the solver should stop, `false` otherwise.
     fn should_stop(&mut self) -> bool;
 

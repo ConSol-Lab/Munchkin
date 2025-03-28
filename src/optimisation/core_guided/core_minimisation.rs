@@ -1,11 +1,30 @@
+use std::time::Duration;
+
 use crate::branching::Brancher;
 use crate::predicates::Predicate;
+use crate::termination::Combinator;
+use crate::termination::ConflictBudget;
 use crate::termination::TerminationCondition;
+use crate::termination::TimeBudget;
 use crate::Solver;
 
 pub(crate) struct CoreMinimiser;
 
 impl CoreMinimiser {
+    /// Creates a new termination condition consisting of the original timing budget, a new budget
+    /// with 500 milliseconds, and a new conflict budget using the provided `budget`.
+    pub(crate) fn create_termination_condition(
+        original_termination_budget: &mut impl TerminationCondition,
+        budget: usize,
+    ) -> impl TerminationCondition {
+        Combinator::new(
+            Combinator::new(
+                original_termination_budget.clone(),
+                TimeBudget::starting_now(Duration::from_millis(500)),
+            ),
+            ConflictBudget::with_budget(budget),
+        )
+    }
     /// Minimises the provided `core` using deletion-based core minimisation
     #[allow(unused, reason = "Will be used in the assignment")]
     #[allow(clippy::ptr_arg, reason = "Will not be present when implemented")]
@@ -21,10 +40,12 @@ impl CoreMinimiser {
         // To implement this method you can use the following methods:
         // - [`Solver::satisfy_under_assumptions`] to solve given a list of assumptions
         //
-        // You can use the provided `termination` and `brancher`. If you would like to use a
-        // smaller time limit then that is also possible using [`TimeBudget::starting_now`] or you
-        // can impose a conflict limit using [`ConflictBudget::with_budget`] (or a combination of
-        // the two using [`Combinator::new`]).
+        // Use the provided `termination_condition` as input; you should change the conflict
+        // budget.
+        let conflict_budget = todo!();
+        let mut termination_condition =
+            Self::create_termination_condition(termination, conflict_budget);
+
         todo!();
 
         // We add the statistic of how many elements were removed by core minimisation
