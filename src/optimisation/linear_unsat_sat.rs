@@ -47,8 +47,8 @@ where
         _termination: &mut impl TerminationCondition,
         _solver: &mut Solver,
     ) -> OptimisationResult {
-        // In this method you should optimise `self.objective` according to the provided
-        // `self.direction` using the Linear UNSAT-SAT approach.
+        // In this method you should optimise `self.objective`; you can ignore the direction as it
+        // will always be minimising.
         //
         // IMPORTANT NOTE: Always ensure that you check the provided [`TerminationCondition`] using
         // [`TerminationCondition::should_stop`] and return a [`OptimisationResult::Unknown`] if

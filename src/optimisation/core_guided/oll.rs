@@ -84,8 +84,8 @@ where
         _termination: &mut impl TerminationCondition,
         _solver: &mut Solver,
     ) -> OptimisationResult {
-        // In this method you should optimise `self.objective` according to the provided
-        // `self.direction` using the OLL core-guided search approach.
+        // In this method you should optimise `self.objective`; you can ignore the direction as it
+        // will always be minimising.
         //
         // IMPORTANT NOTE: Always ensure that you check the provided [`TerminationCondition`] using
         // [`TerminationCondition::should_stop`] and return a [`OptimisationResult::Unknown`] if
@@ -108,7 +108,8 @@ where
         //   such that it can be used in linear sums.
         //
         // To create a constraint of the form `\sum x <= d` where `d` is a variable, you can use the
-        // function [`Self::create_linear_inequality`].
+        // function [`Self::create_linear_inequality`]. You can get the variable in a predicate
+        // using [`Predicate::get_domain`].
         //
         // We recommend calling [`Self::update_best_solution_and_process`] when you find a
         // solution.
