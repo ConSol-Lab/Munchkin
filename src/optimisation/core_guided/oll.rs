@@ -50,12 +50,13 @@ where
         }
     }
 
-    /// Adds a constraint to the solver that `\sum variables <= new_var`
+    /// Adds a constraint to the solver that `\sum variables + c <= new_var`
     #[allow(unused, reason = "Will be used in the assignments")]
     pub(crate) fn create_linear_inequality(
         solver: &mut Solver,
         variables: &[DomainId],
         new_var: DomainId,
+        constant: i32,
     ) {
         let result = solver
             .add_constraint(constraints::less_than_or_equals(
@@ -64,7 +65,7 @@ where
                     .map(|&var| var.scaled(1))
                     .chain(std::iter::once(new_var.scaled(-1)))
                     .collect::<Vec<_>>(),
-                0,
+                -constant,
             ))
             .post(NonZero::new(1).unwrap());
         munchkin_assert_simple!(
@@ -85,7 +86,8 @@ where
         _solver: &mut Solver,
     ) -> OptimisationResult {
         // In this method you should optimise `self.objective`; you can ignore the direction as it
-        // will always be minimising.
+        // will always be minimising. You can assume that all variables in the objective will be
+        // 0-1 integer variables with weight 1.
         //
         // IMPORTANT NOTE: Always ensure that you check the provided [`TerminationCondition`] using
         // [`TerminationCondition::should_stop`] and return a [`OptimisationResult::Unknown`] if
@@ -107,9 +109,9 @@ where
         // - [`Solver::new_bounded_integer`] allows you to create a new integer variable a predicate
         //   such that it can be used in linear sums.
         //
-        // To create a constraint of the form `\sum x <= d` where `d` is a variable, you can use the
-        // function [`Self::create_linear_inequality`]. You can get the variable in a predicate
-        // using [`Predicate::get_domain`].
+        // To create a constraint of the form `\sum x + c<= d` where `d` is a variable, and `c` is a
+        // constant; you can use the function [`Self::create_linear_inequality`]. You can
+        // get the variable in a predicate using [`Predicate::get_domain`].
         //
         // We recommend calling [`Self::update_best_solution_and_process`] when you find a
         // solution.

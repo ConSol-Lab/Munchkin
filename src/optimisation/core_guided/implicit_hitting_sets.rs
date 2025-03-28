@@ -136,7 +136,8 @@ where
         solver: &mut Solver,
     ) -> OptimisationResult {
         // In this method you should optimise `self.objective`; you can ignore the direction as it
-        // will always be minimising.
+        // will always be minimising. You can assume that all variables in the objective will be
+        // 0-1 integer variables with weight 1.
         //
         // IMPORTANT NOTE: Always ensure that you check the provided [`TerminationCondition`] using
         // [`TerminationCondition::should_stop`] and return a [`OptimisationResult::Unknown`] if

@@ -32,8 +32,8 @@ OPTIMISATION_CONTRIBUTION = {
 
 OPTIMISATION_MODELS = {
     "linear-unsat-sat": ["rcpsp", "tsp", "cluster_editing"],
-    "oll": ["rcpsp", "cluster_editing"],
-    "ihs": ["rcpsp", "cluster_editing"]
+    "oll": ["cluster_editing"],
+    "ihs": ["cluster_editing"]
 }
 
 CORE_MINIMISATION_TEST_MODULE = "core_minimisation"
