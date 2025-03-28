@@ -154,8 +154,8 @@ fn assert_superset(proof: &str, expected: &str) {
     if type_expected == 'i' {
         return;
     }
-    let mut split_proof = proof[2..].split("c").next().unwrap().split("0");
-    let mut split_expected = expected[2..].split("c").next().unwrap().split("0");
+    let mut split_proof = proof[2..].split("c").next().unwrap().split(" 0");
+    let mut split_expected = expected[2..].split("c").next().unwrap().split(" 0");
 
     let proof_lhs = split_proof
         .next()
@@ -188,26 +188,8 @@ fn assert_superset(proof: &str, expected: &str) {
     let expected_rhs = split_expected.next();
     match (proof_rhs, expected_rhs) {
         (Some(proof_rhs), Some(expected_rhs)) => {
-            let proof_rhs = proof_rhs
-                .split(" ")
-                .filter(|element| !element.trim().is_empty())
-                .map(|element| {
-                    element
-                        .parse::<i32>()
-                        .expect("Expected {element} to be parseable to int")
-                })
-                .collect::<Vec<_>>();
-            let expected_rhs = expected_rhs
-                .split(" ")
-                .filter(|element| !element.trim().is_empty())
-                .map(|element| {
-                    element
-                        .parse::<i32>()
-                        .expect("Expected {element} to be parseable to int")
-                })
-                .collect::<Vec<_>>();
-            for element in expected_rhs {
-                assert!(proof_rhs.contains(&element));
+            if proof_rhs != expected_rhs {
+                panic!("Hints should be identical!");
             }
         }
         (x, y) => panic!("Your hints: {x:?} but expected: {y:?}"),
