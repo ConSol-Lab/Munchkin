@@ -226,7 +226,7 @@ def iter_solutions(run: Path) -> Iterable[str]:
         return iter([])
 
     return filter(
-        lambda s: s != "" and s != OPTIMALITY_PROVEN, 
+        lambda s: s != "" and s != OPTIMALITY_PROVEN and s.startswith("%%"), 
         map(lambda s: s.strip(), output.split(SOLUTION_SEPARATOR))
     )
 
@@ -258,7 +258,9 @@ def generate_dzn_instances(run: Path) -> Path:
     for idx, solution in enumerate(solutions):
         solution = solution.strip()
 
-        if solution == "":
+        filtered_lines = [line for line in solution.splitlines() if not line.startswith("%%")]
+
+        if len(filtered_lines) == 0 or solution == "":
             continue
 
         solution_file = solutions_dir / f"sol-{idx}.dzn"
