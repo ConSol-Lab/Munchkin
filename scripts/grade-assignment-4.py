@@ -86,7 +86,7 @@ def grade_core_minimisation() -> int:
     context = evaluate(Args(
         model="cluster_editing",
         timeout=INSTANCE_TIMEOUT,
-        flags=["-O", "oll"],
+        flags=["-O", "oll", "--use-core-minimisation"],
         allow_dirty=True,
     ))
     if context is None:
