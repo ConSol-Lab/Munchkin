@@ -1,7 +1,5 @@
 use std::num::NonZero;
 
-use super::outputs::SolutionReference;
-use super::predicates::IntegerPredicate;
 use super::results::OptimisationResult;
 use super::results::SatisfactionResult;
 use super::results::SatisfactionResultUnderAssumptions;
@@ -15,7 +13,6 @@ use crate::branching::value_selection::ValueSelector;
 use crate::branching::variable_selection::VariableSelector;
 use crate::branching::Brancher;
 use crate::constraints::ConstraintPoster;
-use crate::engine::constraint_satisfaction_solver::CumulativeMovingAverage;
 use crate::engine::cp::propagation::Propagator;
 use crate::engine::predicates::predicate::Predicate;
 use crate::engine::termination::TerminationCondition;
@@ -24,9 +21,7 @@ use crate::engine::variables::IntegerVariable;
 use crate::engine::variables::Literal;
 use crate::engine::ConstraintSatisfactionSolver;
 use crate::munchkin_assert_simple;
-use crate::optimisation::OptimisationProcedure;
 use crate::options::SolverOptions;
-use crate::predicate;
 use crate::results::solution_iterator::SolutionIterator;
 use crate::results::unsatisfiable::UnsatisfiableUnderAssumptions;
 use crate::statistics::log_statistic;
@@ -81,10 +76,26 @@ use crate::statistics::log_statistic_postfix;
 ///
 /// # Using the Solver
 /// For examples on how to use the solver, see the [root-level crate documentation](crate) or [one of these examples](https://github.com/ConSol-Lab/Pumpkin/tree/master/pumpkin-lib/examples).
-#[derive(Default)]
 pub struct Solver {
     /// The internal [`ConstraintSatisfactionSolver`] which is used to solve the problems.
-    pub(crate) satisfaction_solver: ConstraintSatisfactionSolver,
+    satisfaction_solver: ConstraintSatisfactionSolver,
+    /// The function is called whenever an optimisation function finds a solution; see
+    /// [`Solver::with_solution_callback`].
+    solution_callback: Box<dyn Fn(&Solution)>,
+}
+
+impl Default for Solver {
+    fn default() -> Self {
+        Self {
+            satisfaction_solver: Default::default(),
+            solution_callback: create_empty_function(),
+        }
+    }
+}
+
+/// Creates a place-holder empty function which does not do anything when a solution is found.
+fn create_empty_function() -> Box<dyn Fn(&Solution)> {
+    Box::new(|_| {})
 }
 
 impl std::fmt::Debug for Solver {
@@ -100,12 +111,14 @@ impl Solver {
     pub fn with_options(solver_options: SolverOptions) -> Self {
         Solver {
             satisfaction_solver: ConstraintSatisfactionSolver::new(solver_options),
+            solution_callback: create_empty_function(),
         }
     }
 
     pub fn with_options_and_conflict_resolver(solver_options: SolverOptions) -> Self {
         Solver {
             satisfaction_solver: ConstraintSatisfactionSolver::new(solver_options),
+            solution_callback: create_empty_function(),
         }
     }
 
@@ -117,6 +130,16 @@ impl Solver {
     /// Conclude the proof with the unsat conclusion.
     pub(crate) fn conclude_proof_unsat(&mut self) {
         self.satisfaction_solver.conclude_proof_unsat();
+    }
+
+    /// Adds a call-back to the [`Solver`] which is called every time that a solution is found when
+    /// optimising using [`Solver::maximise`] or [`Solver::minimise`].
+    ///
+    /// Note that this will also
+    /// perform the call-back on the optimal solution which is returned in
+    /// [`OptimisationResult::Optimal`].
+    pub fn with_solution_callback(&mut self, solution_callback: impl Fn(&Solution) + 'static) {
+        self.solution_callback = Box::new(solution_callback);
     }
 
     /// Logs the statistics currently present in the solver with the provided objective value.
@@ -134,12 +157,6 @@ impl Solver {
     /// Unwrap into the underlying satisfaction solver for low-level API access.
     pub(crate) fn into_satisfaction_solver(self) -> ConstraintSatisfactionSolver {
         self.satisfaction_solver
-    }
-
-    pub(crate) fn create_empty_clone(&self) -> Self {
-        Self {
-            satisfaction_solver: self.satisfaction_solver.create_empty_clone(),
-        }
     }
 }
 
@@ -167,49 +184,10 @@ impl Solver {
         self.satisfaction_solver.get_literal(predicate)
     }
 
-    /// Creates a new 0-1 integer variable `var` and links it such that `var <-> predicate`.
-    pub fn new_variable_for_predicate(&mut self, predicate: Predicate) -> DomainId {
-        let literal = self.get_literal(predicate);
-        let variable = self.new_bounded_integer(0, 1);
-
-        let variable_is_true = self.get_literal(predicate!(variable >= 1));
-
-        // We add the constraint literal <-> variable
-        //
-        // First we add literal -> variable
-        let result = self.add_clause([!literal, variable_is_true]);
-        munchkin_assert_simple!(
-            result.is_ok(),
-            "Expected result to be okay but was {result:?}"
-        );
-        // Then we add literal <- variable
-        let result = self.add_clause([!variable_is_true, literal]);
-        munchkin_assert_simple!(
-            result.is_ok(),
-            "Expected result to be okay but was {result:?}"
-        );
-
-        variable
-    }
-
-    /// Returns the predicate(s) linked to the provided `literal`.
-    pub fn get_predicates(&self, literal: Literal) -> impl Iterator<Item = IntegerPredicate> + '_ {
-        self.satisfaction_solver
-            .variable_literal_mappings
-            .get_predicates_for_literal(literal)
-    }
-
     /// Get the value of the given [`Literal`] at the root level (after propagation), which could be
     /// unassigned.
     pub fn get_literal_value(&self, literal: Literal) -> Option<bool> {
         self.satisfaction_solver.get_literal_value(literal)
-    }
-
-    pub fn get_minimisation_statistics(&mut self) -> &CumulativeMovingAverage {
-        &mut self
-            .satisfaction_solver
-            .counters
-            .average_number_of_elements_removed_by_core_minimisation
     }
 
     /// Get a literal which is globally true.
@@ -415,10 +393,10 @@ impl Solver {
     /// terminate by the provided [`TerminationCondition`]) and returns a [`SatisfactionResult`]
     /// which can be used to obtain the found solution or find other solutions.
     ///
-    /// This method takes as input a list of [`Predicate`]s which represent so-called assumptions
-    /// (see \[1\] for a more detailed explanation). The [`Literal`]s corresponding to
-    /// [`Predicate`]s over [`IntegerVariable`]s (e.g. lower-bound predicates) can be retrieved
-    /// from the [`Solver`] using [`Solver::get_literal`].
+    /// This method takes as input a list of [`Literal`]s which represent so-called assumptions (see
+    /// \[1\] for a more detailed explanation). The [`Literal`]s corresponding to [`Predicate`]s
+    /// over [`IntegerVariable`]s (e.g. lower-bound predicates) can be retrieved from the [`Solver`]
+    /// using [`Solver::get_literal`].
     ///
     /// # Bibliography
     /// \[1\] N. Eén and N. Sörensson, ‘Temporal induction by incremental SAT solving’, Electronic
@@ -427,16 +405,12 @@ impl Solver {
         &'this mut self,
         brancher: &'brancher mut B,
         termination: &mut T,
-        assumptions: &[Predicate],
+        assumptions: &[Literal],
     ) -> SatisfactionResultUnderAssumptions<'this, 'brancher, B> {
-        match self.satisfaction_solver.solve_under_assumptions(
-            &assumptions
-                .iter()
-                .map(|predicate| self.get_literal(*predicate))
-                .collect::<Vec<_>>(),
-            termination,
-            brancher,
-        ) {
+        match self
+            .satisfaction_solver
+            .solve_under_assumptions(assumptions, termination, brancher)
+        {
             CSPSolverExecutionFlag::Feasible => {
                 let solution: Solution = self.satisfaction_solver.get_solution_reference().into();
                 // Reset the state whenever we return a result
@@ -469,27 +443,186 @@ impl Solver {
     }
 
     /// Solves the model currently in the [`Solver`] to optimality where the provided
-    /// `objective_variable` is optimised as indicated by the `direction` (or is indicated to
-    /// terminate by the provided [`TerminationCondition`]). Uses a search strategy based on the
-    /// provided [`OptimisationProcedure`]
+    /// `objective_variable` is minimised (or is indicated to terminate by the provided
+    /// [`TerminationCondition`]).
     ///
     /// It returns an [`OptimisationResult`] which can be used to retrieve the optimal solution if
     /// it exists.
-    pub fn optimise<Callback: Fn(&Solver, SolutionReference)>(
+    pub fn minimise(
         &mut self,
         brancher: &mut impl Brancher,
         termination: &mut impl TerminationCondition,
-        mut optimisation_procedure: impl OptimisationProcedure<Callback>,
+        objective_variable: impl IntegerVariable,
     ) -> OptimisationResult {
-        optimisation_procedure.optimise(brancher, termination, self)
+        self.minimise_internal(brancher, termination, objective_variable, false)
     }
-}
 
-#[derive(Debug, Clone, Copy)]
-/// The direction of the optimisation, either maximising or minimising.
-pub enum OptimisationDirection {
-    Maximise,
-    Minimise,
+    /// Solves the model currently in the [`Solver`] to optimality where the provided
+    /// `objective_variable` is maximised (or is indicated to terminate by the provided
+    /// [`TerminationCondition`]).
+    ///
+    /// It returns an [`OptimisationResult`] which can be used to retrieve the optimal solution if
+    /// it exists.
+    pub fn maximise(
+        &mut self,
+        brancher: &mut impl Brancher,
+        termination: &mut impl TerminationCondition,
+        objective_variable: impl IntegerVariable,
+    ) -> OptimisationResult {
+        self.minimise_internal(brancher, termination, objective_variable.scaled(-1), true)
+    }
+
+    /// The internal method which optimizes the objective function, this function takes an extra
+    /// argument (`is_maximising`) as compared to [`Solver::maximise`] and [`Solver::minimise`]
+    /// which determines whether the logged objective value should be scaled by `-1` or not.
+    ///
+    /// This is necessary due to the fact that [`Solver::maximise`] simply calls minimise with
+    /// the objective variable scaled with `-1` which would lead to incorrect statistic if not
+    /// scaled back.
+    fn minimise_internal(
+        &mut self,
+        brancher: &mut impl Brancher,
+        termination: &mut impl TerminationCondition,
+        objective_variable: impl IntegerVariable,
+        is_maximising: bool,
+    ) -> OptimisationResult {
+        // If we are maximising then when we simply scale the variable by -1, however, this will
+        // lead to the printed objective value in the statistics to be multiplied by -1; this
+        // objective_multiplier ensures that the objective is correctly logged.
+        let objective_multiplier = if is_maximising { -1 } else { 1 };
+
+        let initial_solve = self.satisfaction_solver.solve(termination, brancher);
+        match initial_solve {
+            CSPSolverExecutionFlag::Feasible => {}
+            CSPSolverExecutionFlag::Infeasible => {
+                // Reset the state whenever we return a result
+                self.satisfaction_solver.restore_state_at_root(brancher);
+                return OptimisationResult::Unsatisfiable;
+            }
+            CSPSolverExecutionFlag::Timeout => {
+                // Reset the state whenever we return a result
+                self.satisfaction_solver.restore_state_at_root(brancher);
+                return OptimisationResult::Unknown;
+            }
+        }
+        let mut best_objective_value = Default::default();
+        let mut best_solution = Solution::default();
+
+        self.process_solution(
+            objective_multiplier,
+            &objective_variable,
+            &mut best_objective_value,
+            &mut best_solution,
+            brancher,
+        );
+        loop {
+            self.satisfaction_solver.restore_state_at_root(brancher);
+
+            if self
+                .strengthen(
+                    &objective_variable,
+                    best_objective_value * objective_multiplier as i64,
+                )
+                .is_err()
+            {
+                // Reset the state whenever we return a result
+                self.satisfaction_solver.restore_state_at_root(brancher);
+                return OptimisationResult::Optimal(best_solution);
+            }
+
+            let solve_result = self.satisfaction_solver.solve(termination, brancher);
+            match solve_result {
+                CSPSolverExecutionFlag::Feasible => {
+                    self.debug_bound_change(
+                        &objective_variable,
+                        best_objective_value * objective_multiplier as i64,
+                    );
+                    self.process_solution(
+                        objective_multiplier,
+                        &objective_variable,
+                        &mut best_objective_value,
+                        &mut best_solution,
+                        brancher,
+                    );
+                }
+                CSPSolverExecutionFlag::Infeasible => {
+                    {
+                        // Reset the state whenever we return a result
+                        self.satisfaction_solver.restore_state_at_root(brancher);
+                        return OptimisationResult::Optimal(best_solution);
+                    }
+                }
+                CSPSolverExecutionFlag::Timeout => {
+                    // Reset the state whenever we return a result
+                    self.satisfaction_solver.restore_state_at_root(brancher);
+                    return OptimisationResult::Satisfiable(best_solution);
+                }
+            }
+        }
+    }
+
+    /// Processes a solution when it is found, it consists of the following procedure:
+    /// - Assigning `best_objective_value` the value assigned to `objective_variable` (multiplied by
+    ///   `objective_multiplier`).
+    /// - Storing the new best solution in `best_solution`.
+    /// - Calling [`Brancher::on_solution`] on the provided `brancher`.
+    /// - Logging the statistics using [`Solver::log_statistics_with_objective`].
+    /// - Calling the solution callback stored in [`Solver::solution_callback`].
+    fn process_solution(
+        &self,
+        objective_multiplier: i32,
+        objective_variable: &impl IntegerVariable,
+        best_objective_value: &mut i64,
+        best_solution: &mut Solution,
+        brancher: &mut impl Brancher,
+    ) {
+        *best_objective_value = (objective_multiplier
+            * self
+                .satisfaction_solver
+                .get_assigned_integer_value(objective_variable)
+                .expect("expected variable to be assigned")) as i64;
+        *best_solution = self.satisfaction_solver.get_solution_reference().into();
+
+        self.log_statistics_with_objective(*best_objective_value);
+        brancher.on_solution(self.satisfaction_solver.get_solution_reference());
+        (self.solution_callback)(best_solution);
+    }
+
+    /// Given the current objective value `best_objective_value`, it adds a constraint specifying
+    /// that the objective value should be at most `best_objective_value - 1`. Note that it is
+    /// assumed that we are always minimising the variable.
+    fn strengthen(
+        &mut self,
+        objective_variable: &impl IntegerVariable,
+        best_objective_value: i64,
+    ) -> Result<(), ConstraintOperationError> {
+        self.satisfaction_solver
+            .add_clause([self.satisfaction_solver.get_literal(
+                objective_variable.upper_bound_predicate((best_objective_value - 1) as i32),
+            )])
+    }
+
+    fn debug_bound_change(
+        &self,
+        objective_variable: &impl IntegerVariable,
+        best_objective_value: i64,
+    ) {
+        munchkin_assert_simple!(
+            (self
+                .satisfaction_solver
+                .get_assigned_integer_value(objective_variable)
+                .expect("expected variable to be assigned") as i64)
+                < best_objective_value,
+            "{}",
+            format!(
+                "The current bound {} should be smaller than the previous bound {}",
+                self.satisfaction_solver
+                    .get_assigned_integer_value(objective_variable)
+                    .expect("expected variable to be assigned"),
+                best_objective_value
+            )
+        );
+    }
 }
 
 /// Functions for adding new constraints to the solver.
@@ -528,18 +661,6 @@ impl Solver {
         clause: impl IntoIterator<Item = Literal>,
     ) -> Result<(), ConstraintOperationError> {
         self.satisfaction_solver.add_clause(clause)
-    }
-
-    /// Creates a nogood from `predicates` and adds it to the current formula.
-    ///
-    /// If the formula becomes trivially unsatisfiable, a [`ConstraintOperationError`] will be
-    /// returned. Subsequent calls to this method will always return an error, and no
-    /// modification of the solver will take place.
-    pub fn add_nogood(
-        &mut self,
-        predicates: impl IntoIterator<Item = Predicate>,
-    ) -> Result<(), ConstraintOperationError> {
-        self.satisfaction_solver.add_nogood(predicates)
     }
 
     /// Post a new propagator to the solver. If unsatisfiability can be immediately determined

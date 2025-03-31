@@ -10,7 +10,6 @@ use crate::constraints::SubCircuitElimination;
 use crate::encodings;
 use crate::engine::cp::AssignmentsInteger;
 use crate::options::SolverOptions;
-use crate::predicate;
 use crate::termination::TerminationCondition;
 use crate::variables::AffineView;
 use crate::variables::DomainId;
@@ -25,9 +24,6 @@ pub struct Model {
     variables: Vec<(String, i32, i32)>,
     /// Arrays of variables.
     arrays: Vec<(String, Range<usize>)>,
-    /// Two dimensional arrays of variables - Stores the range of the variables and the number of
-    /// columns
-    two_dimensional_arrays: Vec<(String, (Range<usize>, usize))>,
     /// The constraints in the model.
     constraints: Vec<Constraint>,
 }
@@ -74,29 +70,6 @@ impl Model {
         IntVariableArray(id)
     }
 
-    pub fn new_interval_variable_matrix(
-        &mut self,
-        name: impl Display,
-        lower_bound: i32,
-        upper_bound: i32,
-        num_rows: usize,
-        num_columns: usize,
-    ) -> TwoDimensionalIntVariableArray {
-        let id = self.two_dimensional_arrays.len();
-        let len = num_rows * num_columns;
-
-        let start = self.variables.len();
-        (0..len).for_each(|i| {
-            let _ = self.new_interval_variable(format!("{name}[{i}]"), lower_bound, upper_bound);
-        });
-        let end = self.variables.len();
-
-        self.two_dimensional_arrays
-            .push((name.to_string(), (start..end, num_columns)));
-
-        TwoDimensionalIntVariableArray(id)
-    }
-
     /// Add a constraint to the model.
     ///
     /// It is important to only use constraints with variables created on the same instance of
@@ -112,7 +85,10 @@ impl Model {
             .variables
             .iter()
             .map(|(name, lower_bound, upper_bound)| {
-                (assignment.grow(*lower_bound, *upper_bound), name.clone())
+                (
+                    AffineView::from(assignment.grow(*lower_bound, *upper_bound)),
+                    name.clone(),
+                )
             })
             .unzip();
 
@@ -120,7 +96,6 @@ impl Model {
             variables,
             names,
             arrays: self.arrays.clone(),
-            two_dimensional_arrays: self.two_dimensional_arrays.clone(),
         };
 
         (assignment, solver_variables)
@@ -141,7 +116,11 @@ impl Model {
             .into_iter()
             .map(|(name, lower_bound, upper_bound)| {
                 (
-                    solver.new_named_bounded_integer(lower_bound, upper_bound, name.clone()),
+                    AffineView::from(solver.new_named_bounded_integer(
+                        lower_bound,
+                        upper_bound,
+                        name.clone(),
+                    )),
                     name,
                 )
             })
@@ -151,7 +130,6 @@ impl Model {
             variables,
             names,
             arrays: self.arrays,
-            two_dimensional_arrays: self.two_dimensional_arrays,
         };
 
         let _ = add_constraints(
@@ -381,25 +359,6 @@ impl IntVariable {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct TwoDimensionalIntVariableArray(usize);
-
-impl TwoDimensionalIntVariableArray {
-    pub fn get(&self, model: &Model, row: usize, column: usize) -> IntVariable {
-        let (_, (range, num_columns)) = &model.two_dimensional_arrays[self.0];
-        let elem = (row * num_columns) + column;
-
-        IntVariable {
-            scale: 1,
-            offset: 0,
-            id: range
-                .clone()
-                .nth(elem)
-                .expect("Expected row and column to be in range"),
-        }
-    }
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct IntVariableArray(usize);
 
 impl IntVariableArray {
@@ -421,15 +380,13 @@ impl IntVariableArray {
 pub enum Output {
     Variable(IntVariable),
     Array(IntVariableArray),
-    TwoDimensionalArray(TwoDimensionalIntVariableArray),
 }
 
 #[derive(Clone, Debug)]
 pub struct VariableMap {
-    variables: Vec<DomainId>,
+    variables: Vec<AffineView<DomainId>>,
     names: Vec<String>,
     arrays: Vec<(String, Range<usize>)>,
-    two_dimensional_arrays: Vec<(String, (Range<usize>, usize))>,
 }
 
 impl VariableMap {
@@ -437,29 +394,13 @@ impl VariableMap {
         self.names
             .iter()
             .position(|n| n == name)
-            .map(|index| self.variables[index].clone().scaled(1))
+            .map(|index| self.variables[index].clone())
     }
 
     pub fn to_solver_variable(&self, int_var: IntVariable) -> AffineView<DomainId> {
         self.variables[int_var.id]
             .scaled(int_var.scale)
             .offset(int_var.offset)
-    }
-
-    pub fn variable_to_domain_id(&mut self, solver: &mut Solver, int_var: IntVariable) -> DomainId {
-        let variable = self.variables[int_var.id];
-        if int_var.scale == 1 && int_var.offset == 0 {
-            variable
-        } else if solver.lower_bound(&variable) >= 0 && solver.upper_bound(&variable) <= 1 {
-            let transformed = variable.scaled(int_var.scale).offset(int_var.offset);
-            solver.new_variable_for_predicate(predicate!(transformed <= 0))
-        } else {
-            panic!(
-                "Not yet supported for variable with int_var bounds {}, {}",
-                solver.lower_bound(&variable),
-                solver.upper_bound(&variable)
-            );
-        }
     }
 
     pub fn to_solver_variables<'this, I>(
@@ -493,10 +434,6 @@ impl VariableMap {
             }
 
             Output::Array(int_variable_array) => self.arrays[int_variable_array.0].0.clone(),
-            Output::TwoDimensionalArray(two_dimensional_int_variable_array) => self
-                .two_dimensional_arrays[two_dimensional_int_variable_array.0]
-                .0
-                .clone(),
         }
     }
 
@@ -504,21 +441,8 @@ impl VariableMap {
         let (_, range) = &self.arrays[array.0];
 
         (range.start..range.end)
-            .map(|idx| self.variables[idx].clone().scaled(1))
+            .map(|idx| self.variables[idx].clone())
             .collect()
-    }
-
-    pub fn get_matrix(
-        &self,
-        array: TwoDimensionalIntVariableArray,
-    ) -> Vec<Vec<AffineView<DomainId>>> {
-        let (_, (range, num_columns)) = &self.two_dimensional_arrays[array.0];
-        (range.start..range.end)
-            .map(|id| self.variables[id])
-            .collect::<Vec<_>>()
-            .chunks(*num_columns)
-            .map(|chunk| chunk.iter().map(|var| var.scaled(1)).collect::<Vec<_>>())
-            .collect::<Vec<_>>()
     }
 }
 

@@ -22,10 +22,6 @@ STATISTICS = [
     "averageLearnedNogoodLbd",
     "nogoodsAfterTrimming",
     "numberOfInferences",
-    "numberOfCallsToSolve",
-    "averageTimePerCallToSolve",
-    "averageCoreSizeBeforeMinimisation",
-    "averageNumberOfElementsRemovedCoreMinimisation",
 ];
 
 
