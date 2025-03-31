@@ -298,7 +298,6 @@ pub mod branching;
 pub mod constraints;
 pub mod encodings;
 pub mod model;
-pub mod optimisation;
 pub mod runner;
 
 // We declare a private module with public use, so that all exports from API are exports directly
