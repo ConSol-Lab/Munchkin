@@ -8,7 +8,7 @@ import shutil
 import sys
 import json
 
-ModelType = Union[Literal["tsp"], Literal["rcpsp"]] 
+ModelType = Union[Literal["tsp"], Literal["rcpsp"], Literal["cluster_editing"]] 
 
 DATA_DIR = (Path(__file__).parent / ".." / "data").resolve()
 EXPERIMENT_DIR = (Path(__file__).parent / ".." / "experiments").resolve()
@@ -16,11 +16,13 @@ EXPERIMENT_DIR = (Path(__file__).parent / ".." / "experiments").resolve()
 INSTANCES = {
     "tsp": (DATA_DIR / "tsp"),
     "rcpsp": (DATA_DIR / "rcpsp"),
+    "cluster_editing": (DATA_DIR / "cluster-editing")
 }
 
 MINIZINC_MODELS = {
     "tsp": (Path(__file__).parent / ".." / "models" / "tsp.mzn").resolve(),
     "rcpsp": (Path(__file__).parent / ".." / "models" / "rcpsp.mzn").resolve(),
+    "cluster_editing": (Path(__file__).parent / ".." / "models" / "cluster_editing.mzn").resolve()
 }
 
 SOLUTION_SEPARATOR = "-" * 10
@@ -137,7 +139,10 @@ def check_runs(context: Context) -> bool:
     return True
 
 
-def check_run(run: Path, model: ModelType, optimal_values: dict) -> RunError | None:
+def check_run(run: Path, model: ModelType, optimal_values: dict) -> bool:
+    """
+        Returns true if there were errors
+    """
     instance_name = run.stem
 
     print(f"Checking {instance_name} for {model}")
@@ -151,7 +156,7 @@ def check_run(run: Path, model: ModelType, optimal_values: dict) -> RunError | N
     wrong_solution = False
 
     if is_optimal(run): 
-        reported_optimal_value = next((int(line.removeprefix("%%  objective=")) for line in list(iter_solutions(run))[-1].splitlines() if line.startswith("%%  objective=")), None)
+        reported_optimal_value = next((int(line.removeprefix("%%  objective=")) for line in list(iter_solutions(run))[-1].splitlines() if line.startswith("%%  objective=")), next((int(line[:-1].removeprefix("Objective = ")) for line in list(iter_solutions(run))[-1].splitlines() if line.startswith("Objective")), None))
         if optimal_values[instance_name] != reported_optimal_value:
             wrong_optimality = True
             print(f"{bcolors.FAIL}Incorrect optimality recorded for {instance_name}; expected {optimal_values[instance_name]} but was {reported_optimal_value}\n{bcolors.ENDC}")
@@ -177,7 +182,7 @@ def run_minizinc(model_path: Path, data_path: Path, solutions: Path) -> bool:
 
     for instance in solutions.iterdir():
         solution_count += 1
-        mzn_command_args = ["minizinc", "--solver", "cp-sat", str(model_path), str(data_path), str(instance)]
+        mzn_command_args = ["minizinc", "--solver", "cp-sat", "-f", str(model_path), str(data_path), str(instance)]
         result = run(mzn_command_args, capture_output=True, text=True)
 
         if result.returncode != 0:
@@ -221,7 +226,7 @@ def iter_solutions(run: Path) -> Iterable[str]:
         return iter([])
 
     return filter(
-        lambda s: s != "" and s != OPTIMALITY_PROVEN, 
+        lambda s: s != "" and s != OPTIMALITY_PROVEN and s.startswith("%%"), 
         map(lambda s: s.strip(), output.split(SOLUTION_SEPARATOR))
     )
 
@@ -253,7 +258,9 @@ def generate_dzn_instances(run: Path) -> Path:
     for idx, solution in enumerate(solutions):
         solution = solution.strip()
 
-        if solution == "":
+        filtered_lines = [line for line in solution.splitlines() if not line.startswith("%%")]
+
+        if len(filtered_lines) == 0 or solution == "":
             continue
 
         solution_file = solutions_dir / f"sol-{idx}.dzn"
@@ -292,7 +299,14 @@ class Args:
     explanation_checks: bool
     """If true, enables the explanation checks"""
 
-
+    def __init__(self, model: ModelType, timeout: int, flags=[], with_proofs=False, allow_dirty=False, explanation_checks= False):
+        self.model = model
+        self.timeout = timeout
+        self.flags = flags
+        self.with_proofs = with_proofs
+        self.allow_dirty = allow_dirty
+        self.explanation_checks = explanation_checks
+    
 @dataclass 
 class GitStatus:
     has_dirty_files: bool

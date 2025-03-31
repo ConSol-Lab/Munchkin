@@ -24,6 +24,11 @@ use crate::model::LinearEncoding;
 use crate::model::Model;
 use crate::model::Output;
 use crate::model::VariableMap;
+use crate::optimisation::linear_sat_unsat::LinearSatUnsat;
+use crate::optimisation::ImplicitHittingSets;
+use crate::optimisation::LinearUnsatSat;
+use crate::optimisation::Oll;
+use crate::optimisation::OptimisationStrategy;
 use crate::options::SolverOptions;
 use crate::predicate;
 use crate::proof::checking::state::CheckingState;
@@ -34,7 +39,8 @@ use crate::proof::Proof;
 use crate::proof::ProofLiterals;
 use crate::results::OptimisationResult;
 use crate::results::ProblemSolution;
-use crate::results::Solution;
+use crate::results::SolutionReference;
+use crate::solver::OptimisationDirection::Minimise;
 use crate::statistics::configure;
 use crate::termination::TimeBudget;
 use crate::Solver;
@@ -91,6 +97,14 @@ pub enum Action<SearchStrategies: OptionEnum> {
         #[arg(short = 'R', long = "non-trivial-propagation")]
         use_non_trivial_propagation_explanation: bool,
 
+        /// The optimisation strategy which is used by the solver
+        #[arg(short = 'O', long = "optimisation", default_value_t)]
+        optimisation_strategy: OptimisationStrategy,
+
+        /// Whether to use core minimisation
+        #[arg(short = 'I', long = "use-core-minimisation")]
+        use_core_minimisation: bool,
+
         /// The number of seconds the solver is allowed to run.
         time_out: u64,
     },
@@ -119,6 +133,11 @@ pub trait Problem<SearchStrategies>: Sized {
 
     /// The objective variable.
     fn objective(&self) -> IntVariable;
+
+    /// Returns the linear objective function (or simply the objective variable if it is non-linear)
+    fn objective_function(&self) -> Vec<IntVariable> {
+        vec![self.objective()]
+    }
 
     fn get_search(
         &self,
@@ -167,13 +186,16 @@ where
             search_strategy,
             conflict_resolution,
             minimisation,
+            optimisation_strategy,
             time_out,
             use_non_trivial_conflict_explanation: use_non_generic_conflict_explanation,
             use_non_trivial_propagation_explanation: use_non_generic_propagation_explanation,
+            use_core_minimisation,
         } => solve(
             model,
             instance,
             search_strategy,
+            optimisation_strategy,
             globals,
             linear_encoding,
             conflict_resolution,
@@ -182,6 +204,7 @@ where
             use_non_generic_propagation_explanation,
             proof_path,
             Duration::from_secs(time_out),
+            use_core_minimisation,
         ),
         Action::Processing {
             scaffold,
@@ -196,6 +219,7 @@ pub fn solve<SearchStrategies>(
     model: Model,
     instance: impl Problem<SearchStrategies>,
     search_strategy: SearchStrategies,
+    optimisation_strategy: OptimisationStrategy,
     globals: Vec<Globals>,
     linear_encoding: Option<LinearEncoding>,
     conflict_resolution: ConflictResolutionStrategy,
@@ -204,6 +228,7 @@ pub fn solve<SearchStrategies>(
     use_non_generic_propagation_explanation: bool,
     proof_path: Option<PathBuf>,
     time_out: Duration,
+    use_core_minimisation: bool,
 ) -> anyhow::Result<()> {
     let mut time_budget = TimeBudget::starting_now(time_out);
     let proof = proof_path
@@ -215,7 +240,7 @@ pub fn solve<SearchStrategies>(
         })
         .transpose()?;
 
-    let (mut solver, solver_variables) = model.into_solver(
+    let (mut solver, mut solver_variables) = model.into_solver(
         SolverOptions {
             conflict_resolver: conflict_resolution,
             minimisation_strategy: minimisation,
@@ -238,27 +263,88 @@ pub fn solve<SearchStrategies>(
     let output_variables: Vec<_> = instance.get_output_variables().collect();
     let callback_solver_variables = solver_variables.clone();
 
-    solver.with_solution_callback(move |solution| {
+    let solution_callback = move |solver: &Solver, solution: SolutionReference| {
+        solver.log_statistics();
         for output in &output_variables {
-            print_output(output, &callback_solver_variables, solution);
+            print_output(output, &callback_solver_variables, &solution);
         }
 
         println!("----------");
-    });
+    };
 
     let mut brancher = instance.get_search(search_strategy, &solver, &solver_variables);
     let objective_variable = solver_variables.to_solver_variable(instance.objective());
 
-    match solver.minimise(&mut brancher, &mut time_budget, objective_variable.clone()) {
+    let result = match optimisation_strategy {
+        OptimisationStrategy::LinearSatUnsat => {
+            let objective_variable = solver_variables.to_solver_variable(instance.objective());
+            solver.optimise(
+                &mut brancher,
+                &mut time_budget,
+                LinearSatUnsat::new(Minimise, objective_variable.clone(), solution_callback),
+            )
+        }
+        OptimisationStrategy::LinearUnsatSat => {
+            let objective_variable = solver_variables.to_solver_variable(instance.objective());
+            solver.optimise(
+                &mut brancher,
+                &mut time_budget,
+                LinearUnsatSat::new(Minimise, objective_variable.clone(), solution_callback),
+            )
+        }
+        OptimisationStrategy::OLL => {
+            let objective_variable =
+                solver_variables.variable_to_domain_id(&mut solver, instance.objective());
+            let objective_function = instance
+                .objective_function()
+                .into_iter()
+                .map(|var| solver_variables.variable_to_domain_id(&mut solver, var))
+                .collect::<Vec<_>>();
+            solver.optimise(
+                &mut brancher,
+                &mut time_budget,
+                Oll::new(
+                    Minimise,
+                    objective_function,
+                    objective_variable,
+                    solution_callback,
+                    use_core_minimisation,
+                ),
+            )
+        }
+        OptimisationStrategy::IHS => {
+            let objective_variable =
+                solver_variables.variable_to_domain_id(&mut solver, instance.objective());
+            let objective_function = instance
+                .objective_function()
+                .into_iter()
+                .map(|var| solver_variables.variable_to_domain_id(&mut solver, var))
+                .collect::<Vec<_>>();
+            solver.optimise(
+                &mut brancher,
+                &mut time_budget,
+                ImplicitHittingSets::new(
+                    Minimise,
+                    objective_function,
+                    objective_variable,
+                    solution_callback,
+                    use_core_minimisation,
+                ),
+            )
+        }
+    };
+
+    match result {
         // Printing of the solution is handled in the callback.
         OptimisationResult::Optimal(solution) => {
             let objective_bound = solution.get_integer_value(objective_variable.clone());
             let literal = solver.get_literal(predicate![objective_variable >= objective_bound]);
             solver.conclude_proof_optimal(literal);
 
-            println!("==========")
+            println!("==========");
+            solver.log_statistics()
         }
-        OptimisationResult::Satisfiable(_) => {}
+        OptimisationResult::Satisfiable(_) => solver.log_statistics(),
 
         OptimisationResult::Unsatisfiable => {
             solver.log_statistics();
@@ -274,7 +360,7 @@ pub fn solve<SearchStrategies>(
     Ok(())
 }
 
-fn print_output(output: &Output, solver_variables: &VariableMap, solution: &Solution) {
+fn print_output(output: &Output, solver_variables: &VariableMap, solution: &SolutionReference) {
     let name = solver_variables.get_name(output);
 
     match output {
@@ -300,6 +386,32 @@ fn print_output(output: &Output, solver_variables: &VariableMap, solution: &Solu
                 }
             }
             println!("];");
+        }
+        Output::TwoDimensionalArray(matrix) => {
+            println!("{name} =");
+            print!("[| ");
+            for (index, for_i) in solver_variables.get_matrix(*matrix).into_iter().enumerate() {
+                if index == 0 {
+                } else {
+                    print!(" | ");
+                }
+                for (var_index, variable) in for_i.iter().enumerate() {
+                    let value = solution.get_integer_value(variable.clone());
+
+                    if value == 0 {
+                        print!("false");
+                    } else if value == 1 {
+                        print!("true");
+                    } else {
+                        panic!("For now we have just implemented this for 2D boolean arrays")
+                    }
+                    if var_index < for_i.len() - 1 {
+                        print!(", ");
+                    }
+                }
+                println!();
+            }
+            println!("|];");
         }
     }
 }

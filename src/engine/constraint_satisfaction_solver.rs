@@ -67,6 +67,7 @@ use crate::engine::DebugHelper;
 use crate::munchkin_assert_extreme;
 use crate::munchkin_assert_moderate;
 use crate::munchkin_assert_simple;
+use crate::predicates::IntegerPredicate;
 use crate::proof::Proof;
 use crate::termination::Indefinite;
 #[cfg(doc)]
@@ -164,7 +165,7 @@ pub struct ConstraintSatisfactionSolver {
     true_literal: Literal,
     false_literal: Literal,
     /// A set of counters updated during the search.
-    counters: Counters,
+    pub(crate) counters: Counters,
     /// Miscellaneous constant parameters used by the solver.
     internal_parameters: SatisfactionSolverOptions,
     /// The names of the variables in the solver.
@@ -373,10 +374,36 @@ impl ConstraintSatisfactionSolver {
     pub(crate) fn declare_ready(&mut self) {
         self.state.declare_ready()
     }
+
+    pub(crate) fn get_predicate(&self, literal: Literal) -> Predicate {
+        self.variable_literal_mappings
+            .get_predicates_for_literal(literal)
+            .next()
+            .expect("Expected at least a single predicate to be attached to the variable")
+            .into()
+    }
 }
 
 // methods that offer basic functionality
 impl ConstraintSatisfactionSolver {
+    pub fn create_empty_clone(&self) -> Self {
+        let mut new_s = Self::default();
+        for _ in self.assignments_propositional.get_propositional_variables() {
+            // Add all of the propositional variables
+            let _ = new_s.create_new_propositional_variable(None);
+        }
+
+        for domain_id in self.assignments_integer.get_domains() {
+            let _ = new_s.create_new_integer_variable(
+                self.assignments_integer.get_lower_bound(domain_id),
+                self.assignments_integer.get_upper_bound(domain_id),
+                None,
+            );
+        }
+
+        new_s
+    }
+
     pub fn new(solver_options: SatisfactionSolverOptions) -> Self {
         let dummy_literal = Literal::new(PropositionalVariable::new(0), true);
 
@@ -452,6 +479,9 @@ impl ConstraintSatisfactionSolver {
         let result = self.solve_internal(termination, brancher);
 
         self.counters.time_spent_in_solver += start_time.elapsed().as_millis() as u64;
+        self.counters
+            .average_time_in_call
+            .add_term(start_time.elapsed().as_millis() as u64);
 
         result
     }
@@ -776,6 +806,7 @@ impl ConstraintSatisfactionSolver {
         termination: &mut impl TerminationCondition,
         brancher: &mut impl Brancher,
     ) -> CSPSolverExecutionFlag {
+        self.counters.num_calls_to_solve += 1;
         loop {
             self.propagate_enqueued(termination);
 
@@ -793,6 +824,7 @@ impl ConstraintSatisfactionSolver {
                 }
             } else {
                 // Conflict has occured
+                termination.encountered_conflict();
 
                 if self.assignments_propositional.is_at_the_root_level() {
                     // If it is at the root level then the problem is infeasible
@@ -990,6 +1022,47 @@ impl ConstraintSatisfactionSolver {
                 learned_nogood,
             )
         }
+    }
+
+    pub(crate) fn extract_core(&mut self, brancher: &mut impl Brancher) -> Vec<Literal> {
+        let core = self.get_core(brancher).retain(|literal| {
+            *literal != self.assignments_propositional.true_literal
+                && *literal != self.assignments_propositional.false_literal
+        });
+
+        if !self.state.is_infeasible() {
+            self.restore_state_at_root(brancher);
+        }
+
+        self.counters.average_core_size.add_term(core.len() as u64);
+
+        core
+    }
+
+    fn get_core(&mut self, brancher: &mut impl Brancher) -> Vec<Literal> {
+        let mut conflict_analysis_context = ConflictAnalysisContext {
+            assumptions: &self.assumptions,
+            clausal_propagator: &mut self.clausal_propagator,
+            variable_literal_mappings: &self.variable_literal_mappings,
+            assignments_integer: &mut self.assignments_integer,
+            assignments_propositional: &mut self.assignments_propositional,
+            internal_parameters: &mut self.internal_parameters,
+            solver_state: &mut self.state,
+            brancher,
+            clause_allocator: &mut self.clause_allocator,
+            explanation_clause_manager: &mut self.explanation_clause_manager,
+            reason_store: &mut self.reason_store,
+            counters: &mut self.counters,
+            propositional_trail_index: &mut self.propositional_trail_index,
+            propagator_queue: &mut self.propagator_queue,
+            watch_list_cp: &mut self.watch_list_cp,
+            sat_trail_synced_position: &mut self.sat_trail_synced_position,
+            cp_trail_synced_position: &mut self.cp_trail_synced_position,
+        };
+        let core = AllDecisionLearning::default()
+            .resolve_conflict(&mut conflict_analysis_context)
+            .expect("Expected all-decision learning to be able to produce a core");
+        core.literals
     }
 
     /// Changes the state based on the conflict analysis result (stored in
@@ -1426,6 +1499,27 @@ impl ConstraintSatisfactionSolver {
         }
     }
 
+    pub fn add_nogood(
+        &mut self,
+        predicates: impl IntoIterator<Item = Predicate>,
+    ) -> Result<(), ConstraintOperationError> {
+        self.add_clause(
+            predicates
+                .into_iter()
+                .map(|predicate| {
+                    let integer_predicate: IntegerPredicate = predicate
+                        .try_into()
+                        .expect("Expected only integer predicates to be provided");
+                    self.variable_literal_mappings.get_literal(
+                        !integer_predicate,
+                        &self.assignments_propositional,
+                        &self.assignments_integer,
+                    )
+                })
+                .collect::<Vec<_>>(),
+        )
+    }
+
     /// Creates a clause from `literals` and adds it to the current formula.
     ///
     /// If the formula becomes trivially unsatisfiable, a [`ConstraintOperationError`] will be
@@ -1484,7 +1578,7 @@ impl ConstraintSatisfactionSolver {
 }
 
 #[derive(Default, Debug, Copy, Clone)]
-pub(crate) struct CumulativeMovingAverage {
+pub struct CumulativeMovingAverage {
     sum: u64,
     num_terms: u64,
 }
@@ -1509,6 +1603,9 @@ impl CumulativeMovingAverage {
 /// [`ConstraintSatisfactionSolver`].
 #[derive(Default, Debug, Copy, Clone)]
 pub(crate) struct Counters {
+    num_calls_to_solve: u64,
+    average_time_in_call: CumulativeMovingAverage,
+
     pub(crate) num_decisions: u64,
     pub(crate) num_conflicts: u64,
     num_propagations: u64,
@@ -1523,10 +1620,19 @@ pub(crate) struct Counters {
     average_number_of_literals_removed_semantic: CumulativeMovingAverage,
     average_number_of_literals_removed_recursive: CumulativeMovingAverage,
     average_number_of_literals_removed_minimisation: CumulativeMovingAverage,
+
+    pub(crate) average_core_size: CumulativeMovingAverage,
+    pub(crate) average_number_of_elements_removed_by_core_minimisation: CumulativeMovingAverage,
 }
 
 impl Counters {
     fn log_statistics(&self) {
+        log_statistic("numberOfCallsToSolve", self.num_calls_to_solve);
+        log_statistic(
+            "averageTimePerCallToSolve",
+            self.average_time_in_call.value(),
+        );
+
         log_statistic("numberOfDecisions", self.num_decisions);
         log_statistic("numberOfConflicts", self.num_conflicts);
         log_statistic("numberOfPropagations", self.num_propagations);
@@ -1561,6 +1667,16 @@ impl Counters {
         log_statistic(
             "averageNumberOfLiteralsRemovedNogoodMinimisation",
             self.average_number_of_literals_removed_minimisation.value(),
+        );
+
+        log_statistic(
+            "averageCoreSizeBeforeMinimisation",
+            self.average_core_size.value(),
+        );
+        log_statistic(
+            "averageNumberOfElementsRemovedCoreMinimisation",
+            self.average_number_of_elements_removed_by_core_minimisation
+                .value(),
         );
     }
 }

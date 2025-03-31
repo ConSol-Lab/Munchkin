@@ -4,7 +4,7 @@ from argparse import ArgumentParser, REMAINDER
 
 from common import *
 
-MODELS = ["tsp", "rcpsp"]
+MODELS = ["tsp", "rcpsp", "cluster_editing"]
 
 
 if __name__ == "__main__":
