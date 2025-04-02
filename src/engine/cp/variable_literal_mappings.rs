@@ -337,7 +337,8 @@ impl VariableLiteralMappings {
         predicate: IntegerPredicate,
     ) {
         munchkin_assert_simple!(
-            !self.literal_to_predicates[!literal].contains(&predicate),
+            (!literal).index() >= self.literal_to_predicates.len()
+                || !self.literal_to_predicates[!literal].contains(&predicate),
             "The predicate is already attached to the _negative_ literal, cannot do this twice."
         );
 
