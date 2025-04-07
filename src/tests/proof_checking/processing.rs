@@ -122,15 +122,15 @@ fn test_inference_introduction() {
     }
     let proof_text = String::from_utf8(buf).unwrap();
     let expected_proof = r#"
-        i 1 2 3 0 1 c:4 l:linear
-        i 2 -1 2 0 3 c:3 l:linear
-        n 3 -1 2 0 1 2
-        i 4 -2 3 0 -4 c:6 l:linear
-        i 5 4 -2 0 3 c:5 l:linear
-        n 6 -2 -1 0 4 5
-        n 7 -1 0 3 6
-        i 8 4 3 0 -1 c:6 l:linear
-        i 9 1 4 0 3 c:5 l:linear
+        i 1 -2 3 0 1 c:3 l:linear
+        i 2 3 1 0 2 c:4 l:linear
+        n 3 -2 3 0 1 2
+        i 4 4 -3 0 1 c:5 l:linear
+        i 5 -3 1 0 -4 c:6 l:linear
+        n 6 -3 -2 0 4 5
+        n 7 -2 0 3 6
+        i 8 2 4 0 1 c:5 l:linear
+        i 9 4 1 0 -2 c:6 l:linear
         n 10 0 7 8 9
     "#;
 
