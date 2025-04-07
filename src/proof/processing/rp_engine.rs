@@ -236,7 +236,10 @@ impl RpEngine {
         self.solver.propagate_enqueued(&mut Indefinite);
 
         if self.solver.is_conflicting() {
-            Err(self.get_conflict_reasons())
+            let mut reasons = self.get_conflict_reasons();
+            reasons.reverse();
+
+            Err(reasons)
         } else {
             Ok(())
         }

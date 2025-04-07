@@ -128,10 +128,10 @@ fn test_inference_introduction() {
         i 4 -2 3 0 -4 c:6 l:linear
         i 5 4 -2 0 3 c:5 l:linear
         n 6 -2 -1 0 4 5
-        n 7 -1 0 6 3
+        n 7 -1 0 3 6
         i 8 4 3 0 -1 c:6 l:linear
         i 9 1 4 0 3 c:5 l:linear
-        n 10 0 8 9 7
+        n 10 0 7 8 9
     "#;
 
     // We do the trimming because the format doesn't care about whitespace and so we are robust
