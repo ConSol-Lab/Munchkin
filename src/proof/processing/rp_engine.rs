@@ -13,6 +13,7 @@
 //! and given that Pumpkin implements such an engine, the [`RpEngine`] exposes an API to verify the
 //! RP property of clauses.
 
+use std::collections::VecDeque;
 use std::num::NonZero;
 
 use log::warn;
@@ -248,7 +249,7 @@ impl RpEngine {
 
         let mut queue = self.initialise_explain_queue(&mut reasons);
 
-        while let Some(to_explain) = queue.pop() {
+        while let Some(to_explain) = queue.pop_front() {
             if !seen.insert(to_explain) {
                 continue;
             }
@@ -331,12 +332,12 @@ impl RpEngine {
         reasons
     }
 
-    fn initialise_explain_queue(&mut self, reasons: &mut Vec<ConflictReason>) -> Vec<Literal> {
+    fn initialise_explain_queue(&mut self, reasons: &mut Vec<ConflictReason>) -> VecDeque<Literal> {
         if let Some(violated_assumption) = self.solver.state.get_violated_assumption() {
             // In this case, one of the assumptions is directly contradicted by previous fixpoint
             // propagation. In that case, we explain why the opposite of the violated assumption is
             // true, to capture everything involved in the conflict.
-            return vec![!violated_assumption];
+            return vec![!violated_assumption].into();
         }
 
         let conflict_info = self.solver.state.get_conflict_info();
@@ -398,7 +399,7 @@ impl RpEngine {
                         label,
                     });
 
-                    premises
+                    premises.into()
                 } else {
                     unreachable!("the reference is either a propagation or a clause")
                 }
@@ -436,7 +437,7 @@ impl RpEngine {
                     label,
                 });
 
-                premises
+                premises.into()
             }
         }
     }
