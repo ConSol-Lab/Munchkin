@@ -48,13 +48,13 @@ where
 
 #[allow(dead_code, reason = "will be used in assignment")]
 fn verify_conclusion(
-    conclusion: Conclusion<AtomicConstraint<String>>,
+    _: Conclusion<AtomicConstraint<String>>,
     state: CheckingState,
 ) -> anyhow::Result<()> {
-    match conclusion {
-        Conclusion::Unsatisfiable => conclusion::verify_unsat(state),
-        Conclusion::Optimal(c) => conclusion::verify_optimal(state, to_int_atomic(c)?),
-    }
+    // In case it is an optimal conclusion, the problem will have been converted to a satisfaction
+    // problem, asking for any solution in which the negation of the objective bound holds. If we
+    // can conclude unsat here, then the bound is proven.
+    conclusion::verify_unsat(state)
 }
 
 #[allow(dead_code, reason = "will be used in assignment")]

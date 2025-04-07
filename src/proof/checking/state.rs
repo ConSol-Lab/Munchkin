@@ -1,6 +1,7 @@
 use std::collections::BTreeMap;
 use std::num::NonZero;
 
+use anyhow::Context;
 use drcp_format::steps::StepId;
 use drcp_format::IntAtomicConstraint;
 
@@ -201,11 +202,15 @@ impl CheckingContext<'_> {
     /// the step are fulfilled, [`Err`] is returned.
     pub(crate) fn propagate_step(&self, step_id: NonZero<u64>) -> anyhow::Result<StepPropagation> {
         if let Some((premises, consequence)) = self.inferences.get(&step_id) {
-            return self.propagate_inference(premises, consequence.as_ref());
+            return self
+                .propagate_inference(premises, consequence.as_ref())
+                .with_context(|| format!("Failed to propagate step {step_id}"));
         }
 
         if let Some(atomics) = self.nogoods.get(&step_id) {
-            return self.propagate_nogood(atomics);
+            return self
+                .propagate_nogood(atomics)
+                .with_context(|| format!("Failed to propagate step {step_id}"));
         }
 
         anyhow::bail!("No step with id {step_id} exists")
@@ -224,7 +229,7 @@ impl CheckingContext<'_> {
         });
 
         if !all_premises_hold {
-            anyhow::bail!("Cannot propagate because not all premises are true.")
+            anyhow::bail!("Not all premises are true.")
         }
 
         match conclusion {
@@ -254,7 +259,7 @@ impl CheckingContext<'_> {
         match unassigned_atomic {
             Some(atomic) => {
                 if assigned_count != nogood.len() - 1 {
-                    anyhow::bail!("Nogood does not propagate anything.")
+                    anyhow::bail!("More than one unassigned atomic in nogood.")
                 }
 
                 Ok(StepPropagation::Atomic(negate(atomic)))

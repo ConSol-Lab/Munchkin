@@ -106,7 +106,6 @@ impl RpEngine {
         assert!(!filtered_clause.is_empty(), "cannot add the empty clause");
 
         let new_handle = RpClauseHandle(self.rp_clauses.len());
-        println!("len = {:?}", filtered_clause.len());
 
         if filtered_clause.len() == 1 {
             self.rp_clauses
@@ -236,10 +235,7 @@ impl RpEngine {
         self.solver.propagate_enqueued(&mut Indefinite);
 
         if self.solver.is_conflicting() {
-            let mut reasons = self.get_conflict_reasons();
-            reasons.reverse();
-
-            Err(reasons)
+            Err(self.get_conflict_reasons())
         } else {
             Ok(())
         }
@@ -247,16 +243,33 @@ impl RpEngine {
 
     fn get_conflict_reasons(&mut self) -> Vec<ConflictReason> {
         let mut reasons = Vec::new();
+        let mut should_explain = self.initialise_to_explain_variables(&mut reasons);
 
-        let mut seen = HashSet::<Literal>::default();
+        let mut next_trail_index = self.solver.assignments_propositional.num_trail_entries() - 1;
 
-        let mut queue = self.initialise_explain_queue(&mut reasons);
+        while !should_explain.is_empty() {
+            // First, determine the next literal to explain.
+            loop {
+                let literal = self
+                    .solver
+                    .assignments_propositional
+                    .get_trail_entry(next_trail_index);
 
-        while let Some(to_explain) = queue.pop_front() {
-            if !seen.insert(to_explain) {
-                continue;
+                if should_explain.contains(&literal) {
+                    break;
+                }
+
+                next_trail_index -= 1;
             }
 
+            let to_explain = self
+                .solver
+                .assignments_propositional
+                .get_trail_entry(next_trail_index);
+
+            assert!(should_explain.remove(&to_explain));
+
+            // Then, explain the literal.
             assert!(self
                 .solver
                 .assignments_propositional
@@ -279,7 +292,7 @@ impl RpEngine {
                     reasons.push(ConflictReason::Clause(*handle));
                 }
                 let clause = &self.solver.clause_allocator[clause];
-                queue.extend(clause.get_literal_slice().iter().skip(1).map(|&lit| !lit));
+                should_explain.extend(clause.get_literal_slice().iter().skip(1).map(|&lit| !lit));
             } else if reference.is_cp_reason() {
                 let reason = reference.get_reason_ref();
                 let propagator = self.solver.reason_store.get_propagator(reason);
@@ -326,26 +339,30 @@ impl RpEngine {
                     label,
                 });
 
-                queue.extend(premises);
+                should_explain.extend(premises);
             } else {
                 unreachable!("the reference is either a propagation or a clause")
             }
         }
 
+        reasons.reverse();
         reasons
     }
 
-    fn initialise_explain_queue(&mut self, reasons: &mut Vec<ConflictReason>) -> VecDeque<Literal> {
+    fn initialise_to_explain_variables(
+        &mut self,
+        reasons: &mut Vec<ConflictReason>,
+    ) -> HashSet<Literal> {
         if let Some(violated_assumption) = self.solver.state.get_violated_assumption() {
             // In this case, one of the assumptions is directly contradicted by previous fixpoint
             // propagation. In that case, we explain why the opposite of the violated assumption is
             // true, to capture everything involved in the conflict.
-            return vec![!violated_assumption].into();
+            return [!violated_assumption].into_iter().collect();
         }
 
         let conflict_info = self.solver.state.get_conflict_info();
 
-        match conflict_info {
+        let to_explain_vec = match conflict_info {
             StoredConflictInfo::VirtualBinaryClause { .. } => unreachable!(),
             StoredConflictInfo::Propagation { reference, literal } => {
                 if reference.is_clause() {
@@ -377,7 +394,7 @@ impl RpEngine {
                         )
                         .unwrap();
 
-                    let premises = conjunction
+                    let mut premises = conjunction
                         .iter()
                         .filter_map(|predicate| match predicate {
                             Predicate::IntegerPredicate(p) => {
@@ -402,7 +419,11 @@ impl RpEngine {
                         label,
                     });
 
-                    premises.into()
+                    // We should also explain why the literal has the opposite polarity in the
+                    // assignment.
+                    premises.push(!*literal);
+
+                    premises
                 } else {
                     unreachable!("the reference is either a propagation or a clause")
                 }
@@ -440,9 +461,11 @@ impl RpEngine {
                     label,
                 });
 
-                premises.into()
+                premises
             }
-        }
+        };
+
+        to_explain_vec.into_iter().collect()
     }
 }
 
