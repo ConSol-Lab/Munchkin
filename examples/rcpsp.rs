@@ -3,6 +3,7 @@ use std::collections::HashSet;
 use clap::ValueEnum;
 use dzn_rs::DataFile;
 use dzn_rs::ShapedArray;
+use fnv::FnvBuildHasher;
 use munchkin::branching::branchers::independent_variable_value_brancher::IndependentVariableValueBrancher;
 use munchkin::branching::Brancher;
 use munchkin::branching::InDomainMin;
@@ -92,7 +93,8 @@ impl Problem<SearchStrategies> for Rcpsp {
 
         let start_times_array: Vec<_> = start_times.as_array(&model).collect();
         for task in 0..num_tasks_usize {
-            let task_successors = successors.get([task]).unwrap();
+            let task_successors: HashSet<_, FnvBuildHasher> =
+                successors.get([task]).unwrap().iter().copied().collect();
 
             for successor in task_successors.iter() {
                 // The instance is 1-indexed.
