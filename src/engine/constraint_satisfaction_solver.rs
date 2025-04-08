@@ -1022,8 +1022,9 @@ impl ConstraintSatisfactionSolver {
                     || self
                         .assignments_propositional
                         .get_literal_assignment_level(learned_nogood.literals[1])
-                        < self.get_decision_level(),
-                        "The literal at the 1-st position in the nogood should be of the next highest decision level; please see the documentation of 'LearnedNogood' for the invariants"
+                        == learned_nogood.literals[1..].iter().map(|literal| self.assignments_propositional.get_literal_assignment_level(*literal)).max().unwrap(),
+                        "The literal at the 1-st position in the nogood should be of the next highest decision level - Decision levels of literals were {:?}; please see the documentation of 'LearnedNogood' for the invariants",
+                        learned_nogood.literals.iter().map(|literal|self.assignments_propositional.get_literal_assignment_level(*literal)).collect::<Vec<_>>()
             );
             self.minimise_learned_nogood(learned_nogood);
 
